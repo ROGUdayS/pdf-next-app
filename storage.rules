@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile photos rules
+    match /profile-photos/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId.split('_')[0]
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // PDF files rules
+    match /pdfs/{userId}/{fileName} {
+      // Allow read if user is authenticated and has access (either owner or in accessUsers)
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        exists(/databases/(default)/documents/pdfs/$(fileName.split('-')[0]))
+      );
+      
+      // Allow write if user is authenticated and it's their directory
+      allow write: if request.auth != null && 
+        request.auth.uid == userId &&
+        request.resource.contentType == 'application/pdf' &&
+        request.resource.size <= 10 * 1024 * 1024; // Max 10MB
+    }
+  }
+} 

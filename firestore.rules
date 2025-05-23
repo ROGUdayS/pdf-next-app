@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /pdfs/{pdfId} {
+      // Allow read if user is authenticated and has access
+      allow read: if request.auth != null && 
+        (resource.data.ownerId == request.auth.uid || 
+         request.auth.token.email in resource.data.accessUsers);
+      
+      // Allow create if user is authenticated
+      allow create: if request.auth != null && 
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.uploadedBy == request.auth.token.email &&
+        request.resource.data.accessUsers.hasOnly([request.auth.token.email]);
+      
+      // Allow update if user is the owner
+      allow update: if request.auth != null && 
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.fileId == resource.data.fileId;
+      
+      // Allow delete if user is the owner
+      allow delete: if request.auth != null && 
+        resource.data.ownerId == request.auth.uid;
+    }
+  }
+} 
