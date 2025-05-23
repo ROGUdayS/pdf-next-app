@@ -31,6 +31,7 @@ import {
   onSnapshot,
   getDoc
 } from 'firebase/firestore';
+import Image from 'next/image';
 
 interface PdfFile {
   id: string;
@@ -42,10 +43,14 @@ interface PdfFile {
   accessUsers: string[];
   thumbnail?: string;
   ownerId: string;
+  thumbnailUrl?: string;
+  thumbnailPath?: string;
+  storagePath?: string;
 }
 
-// Cache for storing thumbnails
+// Cache for storing thumbnails - move outside component to persist between renders
 const thumbnailCache = new Map<string, string>();
+const processedPdfs = new Set<string>();
 
 export default function PDFsPage() {
   const { user } = useAuth();
@@ -62,17 +67,83 @@ export default function PDFsPage() {
   // Function to process a PDF and generate its thumbnail
   const processPdf = async (doc: any): Promise<PdfFile> => {
     const data = doc.data();
+    
+    // If we already have the thumbnailUrl from Firestore, use that directly
+    if (data.thumbnailUrl && !processedPdfs.has(doc.id)) {
+      processedPdfs.add(doc.id);
+      return {
+        id: doc.id,
+        name: data.name || 'Untitled',
+        url: data.url,
+        uploadedBy: data.uploadedBy || 'Unknown',
+        uploadedAt: data.uploadedAt?.toDate() || new Date(),
+        size: data.size || 0,
+        accessUsers: data.accessUsers || [],
+        ownerId: data.ownerId,
+        thumbnailUrl: data.thumbnailUrl,
+        thumbnailPath: data.thumbnailPath,
+        storagePath: data.storagePath
+      };
+    }
+
     let thumbnail: string | undefined = thumbnailCache.get(doc.id);
 
-    if (!thumbnail) {
+    if (!thumbnail && data.url && data.storagePath && !processedPdfs.has(doc.id)) {
       try {
-        const newThumbnail = await generatePdfThumbnail(data.url);
+        console.log('Generating thumbnail for PDF:', data.name);
+        const storageRef = ref(storage, data.storagePath);
+        const freshUrl = await getDownloadURL(storageRef);
+        
+        const newThumbnail = await generatePdfThumbnail(freshUrl);
         if (newThumbnail) {
           thumbnailCache.set(doc.id, newThumbnail);
           thumbnail = newThumbnail;
+
+          try {
+            const response = await fetch(newThumbnail);
+            const blob = await response.blob();
+            
+            const thumbnailFileName = `${doc.id}.png`;
+            const thumbnailPath = `pdfs/${data.ownerId}/thumbnails/${thumbnailFileName}`;
+            const thumbnailRef = ref(storage, thumbnailPath);
+            
+            await uploadBytes(thumbnailRef, blob, {
+              contentType: 'image/png',
+              customMetadata: {
+                pdfId: doc.id,
+                originalName: data.name
+              }
+            });
+            
+            const thumbnailUrl = await getDownloadURL(thumbnailRef);
+            
+            await updateDoc(doc.ref, {
+              thumbnailUrl: thumbnailUrl,
+              thumbnailPath: thumbnailPath
+            });
+            
+            // Mark this PDF as processed
+            processedPdfs.add(doc.id);
+            
+            return {
+              id: doc.id,
+              name: data.name || 'Untitled',
+              url: data.url,
+              uploadedBy: data.uploadedBy || 'Unknown',
+              uploadedAt: data.uploadedAt?.toDate() || new Date(),
+              size: data.size || 0,
+              accessUsers: data.accessUsers || [],
+              ownerId: data.ownerId,
+              thumbnailUrl: thumbnailUrl,
+              thumbnailPath: thumbnailPath,
+              storagePath: data.storagePath
+            };
+          } catch (thumbnailError) {
+            console.error('Error saving thumbnail:', thumbnailError);
+          }
         }
       } catch (error) {
-        console.warn('Failed to generate thumbnail for PDF:', doc.id, error);
+        console.error('Failed to process PDF:', doc.id, error);
       }
     }
 
@@ -85,7 +156,10 @@ export default function PDFsPage() {
       size: data.size || 0,
       accessUsers: data.accessUsers || [],
       thumbnail,
-      ownerId: data.ownerId
+      ownerId: data.ownerId,
+      thumbnailUrl: data.thumbnailUrl,
+      thumbnailPath: data.thumbnailPath,
+      storagePath: data.storagePath
     };
   };
 
@@ -198,7 +272,7 @@ export default function PDFsPage() {
     );
   }, [pdfs]);
 
-  // Modified handleFileUpload to work with real-time updates
+  // Modified handleFileUpload to store storage path
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) {
@@ -226,7 +300,8 @@ export default function PDFsPage() {
     
     try {
       const fileName = `${Date.now()}-${file.name}`;
-      const storageRef = ref(storage, `pdfs/${user.uid}/${fileName}`);
+      const storagePath = `pdfs/${user.uid}/${fileName}`;
+      const storageRef = ref(storage, storagePath);
       
       // Upload file
       const uploadTask = uploadBytesResumable(storageRef, file);
@@ -255,25 +330,26 @@ export default function PDFsPage() {
           try {
             const url = await getDownloadURL(storageRef);
             
-            // Add to Firestore - the real-time listener will handle UI update
+            // Add to Firestore with storage path
             await addDoc(collection(db, 'pdfs'), {
               name: file.name,
               url: url,
+              storagePath: storagePath,
               uploadedBy: user.email,
               uploadedAt: Timestamp.now(),
               size: file.size,
               accessUsers: [user.email as string],
               ownerId: user.uid,
+              thumbnailUrl: null
             });
 
             setError(null);
           } catch (error: any) {
-            console.error('Error saving to Firestore:', error);
+            console.error('Error in upload completion:', error);
             setError(`Failed to save PDF: ${error.message}`);
           }
         }
       );
-
     } catch (error: any) {
       console.error('Upload process failed:', error);
       setError(`Upload failed: ${error.message}`);
@@ -302,20 +378,21 @@ export default function PDFsPage() {
       setError(null);
       setDeletingPdfId(pdf.id);
 
-      // First delete from Firestore
-      await deleteDoc(doc(db, 'pdfs', pdf.id));
-
-      // Then try to delete from Storage if possible
-      try {
-        const fileUrl = new URL(pdf.url);
-        const filePath = decodeURIComponent(fileUrl.pathname.split('/o/')[1].split('?')[0]);
-        const storageRef = ref(storage, filePath);
-        await deleteObject(storageRef);
-      } catch (storageError) {
-        console.warn('Could not delete storage file:', storageError);
+      // Delete the PDF file from Storage
+      if (pdf.storagePath) {
+        const pdfRef = ref(storage, pdf.storagePath);
+        await deleteObject(pdfRef);
       }
 
-      // Update UI - the real-time listener will handle the removal
+      // Delete the thumbnail from Storage if it exists
+      if (pdf.thumbnailPath) {
+        const thumbnailRef = ref(storage, pdf.thumbnailPath);
+        await deleteObject(thumbnailRef);
+      }
+
+      // Delete from Firestore last (in case storage operations fail)
+      await deleteDoc(doc(db, 'pdfs', pdf.id));
+
       setError('PDF deleted successfully');
       setTimeout(() => setError(null), 3000);
     } catch (error: any) {
@@ -361,29 +438,41 @@ export default function PDFsPage() {
       // Reset rename mode first
       handleCancelRename();
 
-      // Temporarily remove the PDF from the list
-      setPdfs(current => {
-        const newMap = new Map(current);
-        newMap.delete(pdf.id);
-        return newMap;
-      });
+      // Create new storage paths
+      const newFileName = `${Date.now()}-${newName.trim()}${newName.toLowerCase().endsWith('.pdf') ? '' : '.pdf'}`;
+      const newStoragePath = `pdfs/${user.uid}/${newFileName}`;
+      
+      if (pdf.storagePath) {
+        // Get the old file reference
+        const oldFileRef = ref(storage, pdf.storagePath);
+        // Create new file reference
+        const newFileRef = ref(storage, newStoragePath);
 
-      // Update in Firestore
-      await updateDoc(pdfRef, {
-        name: newName.trim()
-      });
+        // Download the old file
+        const oldFileBlob = await (await fetch(pdf.url)).blob();
+        
+        // Upload to new location
+        await uploadBytes(newFileRef, oldFileBlob);
+        
+        // Get the new URL
+        const newUrl = await getDownloadURL(newFileRef);
 
-      // Immediately fetch the updated document
-      const updatedDoc = await getDoc(pdfRef);
-      if (updatedDoc.exists()) {
-        const updatedPdf = await processPdf(updatedDoc);
-        setPdfs(current => {
-          const newMap = new Map(current);
-          newMap.set(pdf.id, updatedPdf);
-          return newMap;
+        // Delete the old file
+        await deleteObject(oldFileRef);
+
+        // Update in Firestore
+        await updateDoc(pdfRef, {
+          name: newName.trim(),
+          url: newUrl,
+          storagePath: newStoragePath
+        });
+      } else {
+        // If no storagePath (legacy data), just update the name
+        await updateDoc(pdfRef, {
+          name: newName.trim()
         });
       }
-      
+
       setError('PDF renamed successfully');
       setTimeout(() => setError(null), 3000);
     } catch (error: any) {
@@ -422,6 +511,42 @@ export default function PDFsPage() {
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);
+  };
+
+  // Add this helper function at the top of your component
+  const showFallback = (element: HTMLElement) => {
+    element.style.display = 'none';
+    element.parentElement?.classList.add('pdf-fallback');
+  };
+
+  // Add this function at the top level of your component, alongside other functions like handleDelete
+  const handleDownload = async (pdf: PdfFile) => {
+    try {
+      // Fetch the PDF file
+      const response = await fetch(pdf.url);
+      const blob = await response.blob();
+      
+      // Create a blob URL
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Create temporary link element
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = pdf.name.endsWith('.pdf') ? pdf.name : `${pdf.name}.pdf`; // Ensure .pdf extension
+      
+      // Append to document, click, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Cleanup blob URL
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      // You might want to show an error message to the user here
+    }
   };
 
   return (
@@ -495,48 +620,49 @@ export default function PDFsPage() {
               }}
             >
               {/* Thumbnail */}
-              <div className="relative aspect-w-3 aspect-h-4 bg-gray-100">
-                {(deletingPdfId === pdf.id || renamingPdfId === pdf.id) && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                  </div>
-                )}
-                <div className="group-hover:opacity-90 transition-opacity">
-                  {pdf.thumbnail ? (
-                    <img
-                      src={pdf.thumbnail}
+              {pdf.thumbnailUrl ? (
+                <div className="pdf-thumbnail-container">
+                  <div className="pdf-thumbnail-wrapper">
+                    <Image
+                      src={pdf.thumbnailUrl}
                       alt={`${pdf.name} thumbnail`}
-                      className="object-cover w-full h-48"
+                      width={400}
+                      height={300}
+                      className="pdf-thumbnail"
+                      loading="lazy"
+                      priority={false}
+                      onError={(e) => {
+                        console.error('Failed to load thumbnail:', {
+                          name: pdf.name,
+                          url: pdf.thumbnailUrl
+                        });
+                        const container = (e.target as HTMLElement).parentElement?.parentElement;
+                        if (container) {
+                          container.innerHTML = '';
+                          container.className = 'pdf-fallback';
+                        }
+                      }}
                     />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-48 bg-gray-50">
-                      <svg
-                        className="w-12 h-12 text-gray-400 mb-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <span className="text-sm text-gray-500">PDF Preview</span>
-                    </div>
-                  )}
-                </div>
-                {/* Add a view overlay on hover */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all">
-                  <div className="p-2 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="pdf-fallback">
+                  <svg
+                    className="w-12 h-12 text-gray-400 mb-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span className="text-sm text-gray-400">PDF Preview</span>
+                </div>
+              )}
 
               {/* Content */}
               <div className="p-4" onClick={(e) => e.stopPropagation()}>
@@ -623,6 +749,34 @@ export default function PDFsPage() {
                       >
                         <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                           <div className="py-1">
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent event bubbling
+                                    handleDownload(pdf);
+                                  }}
+                                  className={`${
+                                    active ? 'bg-gray-100' : ''
+                                  } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                                >
+                                  <svg 
+                                    className="mr-3 h-5 w-5 text-gray-400" 
+                                    fill="none" 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                  >
+                                    <path 
+                                      strokeLinecap="round" 
+                                      strokeLinejoin="round" 
+                                      strokeWidth={2} 
+                                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                    />
+                                  </svg>
+                                  Download
+                                </button>
+                              )}
+                            </Menu.Item>
                             <Menu.Item>
                               {({ active }) => (
                                 <button
