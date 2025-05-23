@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { auth } from '@/lib/firebase';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function ResetPassword() {
   const [otp, setOtp] = useState('');
@@ -14,6 +15,8 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
   const [isVerified, setIsVerified] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
@@ -268,17 +271,28 @@ export default function ResetPassword() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   New Password
                 </label>
-                <div className="mt-1">
+                <div className="mt-1 relative">
                   <Input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     minLength={6}
                     className="block w-full"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
                   Password must be at least 6 characters long and contain:
@@ -294,17 +308,28 @@ export default function ResetPassword() {
                 <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
                   Confirm New Password
                 </label>
-                <div className="mt-1">
+                <div className="mt-1 relative">
                   <Input
                     id="confirm-password"
                     name="confirm-password"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     minLength={6}
                     className="block w-full"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
