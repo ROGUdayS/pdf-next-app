@@ -32,6 +32,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import Image from 'next/image';
+import PDFViewer from '@/app/components/PDFViewer';
 
 interface PdfFile {
   id: string;
@@ -63,6 +64,7 @@ export default function PDFsPage() {
   const [renamingPdfId, setRenamingPdfId] = useState<string | null>(null);
   const [editingPdf, setEditingPdf] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [selectedPdf, setSelectedPdf] = useState<PdfFile | null>(null);
 
   // Function to process a PDF and generate its thumbnail
   const processPdf = async (doc: any): Promise<PdfFile> => {
@@ -551,6 +553,13 @@ export default function PDFsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {selectedPdf && (
+        <PDFViewer
+          fileUrl={selectedPdf.url}
+          onClose={() => setSelectedPdf(null)}
+        />
+      )}
+      
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">My PDFs</h1>
         <div className="relative">
@@ -613,9 +622,9 @@ export default function PDFsPage() {
                 deletingPdfId === pdf.id || renamingPdfId === pdf.id ? 'opacity-50' : ''
               } cursor-pointer group`}
               onClick={(e) => {
-                // Only open PDF if we didn't click on a button or input
+                // Only open PDF viewer if we didn't click on a button or input
                 if (!(e.target as HTMLElement).closest('button, input')) {
-                  window.open(pdf.url, '_blank');
+                  setSelectedPdf(pdf);
                 }
               }}
             >

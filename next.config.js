@@ -1,8 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
-    config.resolve.alias.canvas = false;
-    config.resolve.alias.encoding = false;
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Don't attempt to require the canvas module on the server
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        canvas: false,
+      };
+    }
+
     return config;
   },
   images: {
