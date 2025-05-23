@@ -36,16 +36,32 @@ export default function SignUp() {
     try {
       setError('');
       setLoading(true);
-      const userCredential = await signUp(email, password);
+
+      // First, send OTP
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
       
-      // Update the user's display name with first and last name
-      if (userCredential.user) {
-        await updateProfile(userCredential.user, {
-          displayName: `${firstName} ${lastName}`
-        });
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code');
       }
-      
-      router.push('/dashboard'); // Redirect to dashboard after successful signup
+
+      // Store form data in session storage for after verification
+      sessionStorage.setItem('signupData', JSON.stringify({
+        firstName,
+        lastName,
+        email,
+        password
+      }));
+
+      // Redirect to verification page
+      router.push(`/verify?email=${encodeURIComponent(email)}`);
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -58,7 +74,7 @@ export default function SignUp() {
       setError('');
       setLoading(true);
       await signInWithGoogle();
-      router.push('/dashboard'); // Redirect to dashboard after successful sign-in
+      router.push('/dashboard');
     } catch (error: any) {
       setError(error.message);
     } finally {
