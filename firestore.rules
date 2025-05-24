@@ -21,28 +21,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to check if user is in the share list of a PDF
-    function isInShareList(pdfId) {
+    // Helper function to check if user has access to a PDF
+    function hasAccessToPdf(pdfId) {
       let pdf = get(/databases/$(database)/documents/pdfs/$(pdfId));
       return pdf != null && (
-        pdf.data.ownerId == request.auth.uid || // Owner
         pdf.data.isPubliclyShared == true || // Publicly shared
+        pdf.data.ownerId == request.auth.uid || // Owner
         (pdf.data.accessUsers != null && pdf.data.accessUsers.hasAny([request.auth.email])) // Shared with user
       );
     }
 
     // PDF Comments collection
     match /pdf_comments/{commentId} {
-      // Allow read if user is authenticated and in the share list
-      allow read: if isAuthenticated() && isInShareList(resource.data.pdfId);
+      // Allow read if user is authenticated
+      allow read: if isAuthenticated();
       
-      // Allow create if user is authenticated and in the share list
-      allow create: if isAuthenticated() && isInShareList(request.resource.data.pdfId) && 
-        request.resource.data.userId == request.auth.uid;
+      // Allow create if user is authenticated and:
+      // 1. The userId matches the authenticated user
+      // 2. If pdfId is provided, user must have access to that PDF
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid && 
+        (!request.resource.data.keys().hasAny(['pdfId']) || 
+          (request.resource.data.pdfId != null && hasAccessToPdf(request.resource.data.pdfId)));
       
-      // Allow delete if user is the PDF owner
-      allow delete: if isAuthenticated() && 
-        get(/databases/$(database)/documents/pdfs/$(resource.data.pdfId)).data.ownerId == request.auth.uid;
+      // Allow update (for likes and replies) if user is authenticated
+      allow update: if isAuthenticated() && 
+        (!resource.data.keys().hasAny(['pdfId']) || 
+          (resource.data.pdfId != null && hasAccessToPdf(resource.data.pdfId))) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'replies']);
+      
+      // Allow delete if user is the comment creator or PDF owner
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || // Comment creator
+        (resource.data.pdfId != null && 
+          get(/databases/$(database)/documents/pdfs/$(resource.data.pdfId))
+            .data.ownerId == request.auth.uid) // PDF owner
+      );
     }
   }
 } 

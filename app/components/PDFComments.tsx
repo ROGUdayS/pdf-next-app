@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { format } from "date-fns";
 import Image from "next/image";
+import { createHash } from "crypto";
 
 interface Reply {
   id: string;
@@ -41,6 +42,7 @@ interface PDFCommentsProps {
   pdfId: string;
   isOwner: boolean;
   isAuthorized: boolean;
+  fileUrl: string;
 }
 
 interface FirestoreReply {
@@ -50,6 +52,26 @@ interface FirestoreReply {
   userAvatar: string | undefined;
   text: string;
   timestamp: Timestamp;
+}
+
+interface CommentData {
+  pdfContentId: string;
+  pdfId?: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  timestamp: Date;
+  formattedText: string;
+  likes: string[];
+  replies: Reply[];
+}
+
+// Function to generate a consistent hash for a PDF URL
+function generatePdfHash(url: string): string {
+  // Remove any query parameters or fragments from the URL
+  const baseUrl = url.split("?")[0].split("#")[0];
+  // Create a hash of the URL
+  return createHash("sha256").update(baseUrl).digest("hex");
 }
 
 // convert raw editor HTML (with "- " lines) into real UL/LI
@@ -94,6 +116,7 @@ export default function PDFComments({
   pdfId,
   isOwner,
   isAuthorized,
+  fileUrl,
 }: PDFCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -101,17 +124,23 @@ export default function PDFComments({
   const [isItalicActive, setIsItalicActive] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [isReplyBoldActive, setIsReplyBoldActive] = useState(false);
+  const [isReplyItalicActive, setIsReplyItalicActive] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const replyEditorRef = useRef<HTMLDivElement>(null);
   const auth = getAuth();
   const db = getFirestore();
 
-  // subscribe to comments
+  // Generate a consistent identifier for this PDF based on its URL
+  const pdfContentId = generatePdfHash(fileUrl);
+
+  // subscribe to comments using pdfContentId instead of pdfId
   useEffect(() => {
-    if (!isAuthorized || !pdfId) return;
+    if (!isAuthorized || !pdfContentId) return;
 
     const q = query(
       collection(db, "pdf_comments"),
-      where("pdfId", "==", pdfId),
+      where("pdfContentId", "==", pdfContentId),
       orderBy("timestamp", "desc")
     );
 
@@ -129,7 +158,7 @@ export default function PDFComments({
       setComments(docs);
     });
     return () => unsub();
-  }, [pdfId, isAuthorized, db]);
+  }, [pdfContentId, isAuthorized, db]);
 
   // sync Bold/Italic button state
   useEffect(() => {
@@ -141,33 +170,51 @@ export default function PDFComments({
     return () => document.removeEventListener("selectionchange", onSel);
   }, []);
 
-  const toggleBold = () => {
+  const toggleBold = (isReply = false) => {
     document.execCommand("bold");
-    setIsBoldActive((v) => !v);
-    editorRef.current?.focus();
+    if (isReply) {
+      setIsReplyBoldActive((v) => !v);
+      replyEditorRef.current?.focus();
+    } else {
+      setIsBoldActive((v) => !v);
+      editorRef.current?.focus();
+    }
   };
 
-  const toggleItalic = () => {
+  const toggleItalic = (isReply = false) => {
     document.execCommand("italic");
-    setIsItalicActive((v) => !v);
-    editorRef.current?.focus();
+    if (isReply) {
+      setIsReplyItalicActive((v) => !v);
+      replyEditorRef.current?.focus();
+    } else {
+      setIsItalicActive((v) => !v);
+      editorRef.current?.focus();
+    }
   };
 
-  const insertBulletPrefix = () => {
+  const insertBulletPrefix = (isReply = false) => {
     document.execCommand("insertText", false, "- ");
-    editorRef.current?.focus();
+    if (isReply) {
+      replyEditorRef.current?.focus();
+    } else {
+      editorRef.current?.focus();
+    }
   };
 
-  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    setNewComment(e.currentTarget.innerHTML);
+  const handleInput = (e: React.FormEvent<HTMLDivElement>, isReply = false) => {
+    if (isReply) {
+      setReplyText(e.currentTarget.innerHTML);
+    } else {
+      setNewComment(e.currentTarget.innerHTML);
+    }
   };
 
   const addComment = async () => {
     if (!newComment.trim() || !auth.currentUser) return;
     const finalHtml = convertBullets(newComment);
     try {
-      await addDoc(collection(db, "pdf_comments"), {
-        pdfId,
+      const commentData: CommentData = {
+        pdfContentId, // Use the content-based identifier
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || "Anonymous",
         userAvatar: auth.currentUser.photoURL ?? undefined,
@@ -175,7 +222,14 @@ export default function PDFComments({
         formattedText: finalHtml,
         likes: [],
         replies: [],
-      });
+      };
+
+      // Only add pdfId if it exists
+      if (pdfId) {
+        commentData.pdfId = pdfId;
+      }
+
+      await addDoc(collection(db, "pdf_comments"), commentData);
       setNewComment("");
       if (editorRef.current) editorRef.current.innerHTML = "";
     } catch (err) {
@@ -190,12 +244,14 @@ export default function PDFComments({
       const comment = comments.find((c) => c.id === commentId);
       if (!comment) return;
 
+      const finalHtml = convertBullets(replyText);
+
       const newReply: Reply = {
         id: Date.now().toString(),
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || "Anonymous",
         userAvatar: auth.currentUser.photoURL ?? undefined,
-        text: replyText,
+        text: finalHtml,
         timestamp: new Date(),
       };
 
@@ -205,6 +261,7 @@ export default function PDFComments({
 
       setReplyText("");
       setReplyingTo(null);
+      if (replyEditorRef.current) replyEditorRef.current.innerHTML = "";
     } catch (err) {
       console.error(err);
     }
@@ -232,7 +289,7 @@ export default function PDFComments({
     if (!isOwner) return;
     const q = query(
       collection(db, "pdf_comments"),
-      where("pdfId", "==", pdfId)
+      where("pdfContentId", "==", pdfContentId)
     );
     const snap = await getDocs(q);
     await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
@@ -274,9 +331,22 @@ export default function PDFComments({
         {isOwner && (
           <button
             onClick={clearAllComments}
-            className="text-sm text-red-500 hover:text-red-600"
+            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+            title="Clear all comments"
           >
-            Clear All
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
           </button>
         )}
       </div>
@@ -352,7 +422,10 @@ export default function PDFComments({
                           {format(reply.timestamp, "MMM d, yyyy h:mm a")}
                         </span>
                       </div>
-                      <p className="mt-1 text-gray-700">{reply.text}</p>
+                      <div
+                        className="mt-1 text-gray-700"
+                        dangerouslySetInnerHTML={{ __html: reply.text }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -361,26 +434,62 @@ export default function PDFComments({
 
             {/* Reply Input */}
             {replyingTo === c.id && (
-              <div className="ml-8 mt-2 flex items-start space-x-2">
-                <input
-                  type="text"
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Write a reply..."
-                  className="flex-1 p-2 border rounded-lg"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      addReply(c.id);
-                    }
-                  }}
-                />
-                <button
-                  onClick={() => addReply(c.id)}
-                  className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Reply
-                </button>
+              <div className="ml-8 mt-2">
+                <div className="flex space-x-2 mb-2">
+                  <button
+                    onClick={() => toggleBold(true)}
+                    className={`p-2 rounded hover:bg-gray-100 ${
+                      isReplyBoldActive ? "bg-gray-200" : ""
+                    }`}
+                    title="Bold"
+                  >
+                    <strong>B</strong>
+                  </button>
+                  <button
+                    onClick={() => toggleItalic(true)}
+                    className={`p-2 rounded hover:bg-gray-100 ${
+                      isReplyItalicActive ? "bg-gray-200" : ""
+                    }`}
+                    title="Italic"
+                  >
+                    <em>I</em>
+                  </button>
+                  <button
+                    onClick={() => insertBulletPrefix(true)}
+                    className="p-2 rounded hover:bg-gray-100"
+                    title="Insert Bullet Prefix"
+                  >
+                    •
+                  </button>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <div
+                    ref={replyEditorRef}
+                    contentEditable
+                    onInput={(e) => handleInput(e, true)}
+                    className="flex-1 p-2 border rounded-lg outline-none min-h-[3rem]"
+                  />
+                  <button
+                    onClick={() => addReply(c.id)}
+                    className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full hover:bg-blue-600"
+                    title="Send Reply"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 12h14M12 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -391,7 +500,7 @@ export default function PDFComments({
       <div className="p-4 border-t">
         <div className="flex space-x-2 mb-2">
           <button
-            onClick={toggleBold}
+            onClick={() => toggleBold(false)}
             className={`p-2 rounded hover:bg-gray-100 ${
               isBoldActive ? "bg-gray-200" : ""
             }`}
@@ -400,7 +509,7 @@ export default function PDFComments({
             <strong>B</strong>
           </button>
           <button
-            onClick={toggleItalic}
+            onClick={() => toggleItalic(false)}
             className={`p-2 rounded hover:bg-gray-100 ${
               isItalicActive ? "bg-gray-200" : ""
             }`}
@@ -409,19 +518,18 @@ export default function PDFComments({
             <em>I</em>
           </button>
           <button
-            onClick={insertBulletPrefix}
+            onClick={() => insertBulletPrefix(false)}
             className="p-2 rounded hover:bg-gray-100"
             title="Insert Bullet Prefix"
           >
             •
           </button>
         </div>
-
         <div className="flex items-start space-x-2">
           <div
             ref={editorRef}
             contentEditable
-            onInput={handleInput}
+            onInput={(e) => handleInput(e, false)}
             className="flex-1 p-2 border rounded-lg outline-none min-h-[3rem]"
           />
           <button

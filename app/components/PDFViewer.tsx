@@ -656,6 +656,7 @@ export default function PDFViewer({
                 pdfId={pdfId}
                 isOwner={isOwner}
                 isAuthorized={isAuthenticated}
+                fileUrl={fileUrl}
               />
             </div>
           )}
