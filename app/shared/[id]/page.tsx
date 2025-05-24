@@ -92,13 +92,122 @@ export default function SharedPDFPage() {
 
   // Handle renaming saved PDF
   const handleRename = async () => {
-    if (!savedPdfId || !newName.trim()) return;
+    if (!savedPdfId || !newName.trim() || !user) return;
+    const pdfId = params.id?.toString();
+    if (!pdfId) return;
 
     try {
       setIsRenaming(true);
-      await updateDoc(doc(db, "pdfs", savedPdfId), {
-        name: newName.trim(),
-      });
+
+      // Get the current saved PDF data
+      const savedPdfDoc = await getDocs(
+        query(
+          collection(db, "pdfs"),
+          where("originalId", "==", pdfId),
+          where("savedBy", "==", user.uid)
+        )
+      );
+
+      if (!savedPdfDoc.empty) {
+        const savedPdf = savedPdfDoc.docs[0].data();
+
+        // Create new storage paths with new name
+        const newFileName = `${Date.now()}-${newName.trim()}${
+          newName.toLowerCase().endsWith(".pdf") ? "" : ".pdf"
+        }`;
+        const newStoragePath = `pdfs/${user.uid}/${newFileName}`;
+
+        console.log("Renaming saved PDF:", {
+          oldPath: savedPdf.storagePath,
+          newPath: newStoragePath,
+          pdfId: savedPdfId,
+          userId: user.uid,
+        });
+
+        // Get the old file and create new reference
+        const oldFileRef = ref(storage, savedPdf.storagePath);
+        const newFileRef = ref(storage, newStoragePath);
+
+        try {
+          // Download the old file
+          console.log("Downloading old file from:", savedPdf.url);
+          const oldFileBlob = await (await fetch(savedPdf.url)).blob();
+          console.log("Old file downloaded, size:", oldFileBlob.size);
+
+          // Upload to new location
+          console.log("Uploading to new location:", newStoragePath);
+          await uploadBytes(newFileRef, oldFileBlob, {
+            contentType: "application/pdf",
+            customMetadata: {
+              originalPdfId: pdfId,
+              originalName: newName.trim(),
+              originalOwnerId: savedPdf.ownerId,
+            },
+          });
+          console.log("Upload completed");
+
+          // Get the new URL
+          const newUrl = await getDownloadURL(newFileRef);
+          console.log("New URL obtained:", newUrl);
+
+          // Delete the old file
+          console.log("Deleting old file:", savedPdf.storagePath);
+          await deleteObject(oldFileRef);
+          console.log("Old file deleted");
+
+          // Update in Firestore
+          console.log("Updating Firestore document");
+          await updateDoc(doc(db, "pdfs", savedPdfId), {
+            name: newName.trim(),
+            url: newUrl,
+            storagePath: newStoragePath,
+          });
+          console.log("Firestore document updated");
+
+          // Also rename the thumbnail if it exists
+          if (savedPdf.thumbnailPath) {
+            console.log("Renaming thumbnail:", {
+              oldPath: savedPdf.thumbnailPath,
+              newPath: `pdfs/${user.uid}/thumbnails/${savedPdfId}.png`,
+            });
+            const oldThumbnailRef = ref(storage, savedPdf.thumbnailPath);
+            const newThumbnailFileName = `${savedPdfId}.png`;
+            const newThumbnailPath = `pdfs/${user.uid}/thumbnails/${newThumbnailFileName}`;
+            const newThumbnailRef = ref(storage, newThumbnailPath);
+
+            // Download and upload thumbnail with new name
+            const thumbnailBlob = await (
+              await fetch(savedPdf.thumbnailUrl)
+            ).blob();
+            await uploadBytes(newThumbnailRef, thumbnailBlob, {
+              contentType: "image/png",
+              customMetadata: {
+                pdfId: savedPdfId,
+                originalName: newName.trim(),
+                originalOwnerId: savedPdf.ownerId,
+              },
+            });
+
+            // Get new thumbnail URL
+            const newThumbnailUrl = await getDownloadURL(newThumbnailRef);
+
+            // Delete old thumbnail
+            await deleteObject(oldThumbnailRef);
+
+            // Update thumbnail info in Firestore
+            await updateDoc(doc(db, "pdfs", savedPdfId), {
+              thumbnailUrl: newThumbnailUrl,
+              thumbnailPath: newThumbnailPath,
+            });
+          }
+        } catch (renameError) {
+          console.error("Error renaming PDF:", renameError);
+          setError("Failed to rename PDF");
+          setIsRenaming(false);
+          return;
+        }
+      }
+
       setNewName("");
       setIsRenaming(false);
       router.refresh();
@@ -112,6 +221,8 @@ export default function SharedPDFPage() {
   // Handle deleting saved PDF
   const handleDelete = async () => {
     if (!savedPdfId || !user) return;
+    const pdfId = params.id?.toString();
+    if (!pdfId) return;
 
     try {
       setIsDeleting(true);
@@ -120,13 +231,19 @@ export default function SharedPDFPage() {
       const savedPdfDoc = await getDocs(
         query(
           collection(db, "pdfs"),
-          where("originalId", "==", params.id),
+          where("originalId", "==", pdfId),
           where("savedBy", "==", user.uid)
         )
       );
 
       if (!savedPdfDoc.empty) {
         const savedPdf = savedPdfDoc.docs[0].data();
+
+        // Delete the PDF file from storage if it exists
+        if (savedPdf.storagePath) {
+          const pdfRef = ref(storage, savedPdf.storagePath);
+          await deleteObject(pdfRef);
+        }
 
         // Delete thumbnail if it exists
         if (savedPdf.thumbnailPath) {
@@ -151,32 +268,80 @@ export default function SharedPDFPage() {
 
   // Handle saving PDF to user's collection
   const handleSaveToCollection = async () => {
-    if (!user || !pdfData || isSaving || !params.id) return;
+    if (!user || !pdfData || isSaving) return;
+    const pdfId = params.id?.toString();
+    if (!pdfId) return;
 
     try {
       setIsSaving(true);
       // Create a new document in the PDFs collection
-      const newPdfRef = doc(collection(db, "pdfs"));
+      const firestoreDocRef = doc(collection(db, "pdfs"));
 
-      // Generate thumbnail if not already available
-      let thumbnailUrl = pdfData.thumbnailUrl;
+      // First, download the PDF file
+      const pdfResponse = await fetch(pdfData.url);
+      const pdfBlob = await pdfResponse.blob();
+
+      // Create a new storage path for the user's copy
+      const fileName = `${Date.now()}-${pdfData.name}`;
+      const newStoragePath = `pdfs/${user.uid}/${fileName}`;
+      const storageRef = ref(storage, newStoragePath);
+
+      // Upload the PDF to the user's storage bucket
+      await uploadBytes(storageRef, pdfBlob, {
+        contentType: "application/pdf",
+        customMetadata: {
+          originalPdfId: pdfId,
+          originalName: pdfData.name,
+          originalOwnerId: pdfData.ownerId,
+        },
+      });
+
+      // Get the URL for the new PDF
+      const newPdfUrl = await getDownloadURL(storageRef);
+
+      // Handle thumbnail
+      let thumbnailUrl = null;
       let thumbnailPath = null;
 
-      if (!thumbnailUrl) {
+      // If original has thumbnail, copy it
+      if (pdfData.thumbnailUrl) {
         try {
-          const newThumbnail = await generatePdfThumbnail(pdfData.url);
+          const thumbnailResponse = await fetch(pdfData.thumbnailUrl);
+          const thumbnailBlob = await thumbnailResponse.blob();
+
+          const thumbnailFileName = `${firestoreDocRef.id}.png`;
+          thumbnailPath = `pdfs/${user.uid}/thumbnails/${thumbnailFileName}`;
+          const thumbnailRef = ref(storage, thumbnailPath);
+
+          await uploadBytes(thumbnailRef, thumbnailBlob, {
+            contentType: "image/png",
+            customMetadata: {
+              pdfId: firestoreDocRef.id,
+              originalName: pdfData.name,
+              originalOwnerId: pdfData.ownerId,
+            },
+          });
+
+          thumbnailUrl = await getDownloadURL(thumbnailRef);
+        } catch (thumbnailError) {
+          console.error("Error copying thumbnail:", thumbnailError);
+        }
+      } else {
+        // Generate new thumbnail if original doesn't have one
+        try {
+          const newThumbnail = await generatePdfThumbnail(newPdfUrl);
           if (newThumbnail) {
             const response = await fetch(newThumbnail);
             const blob = await response.blob();
 
-            const thumbnailFileName = `${newPdfRef.id}.png`;
+            const thumbnailFileName = `${firestoreDocRef.id}.png`;
             thumbnailPath = `pdfs/${user.uid}/thumbnails/${thumbnailFileName}`;
             const thumbnailRef = ref(storage, thumbnailPath);
 
             await uploadBytes(thumbnailRef, blob, {
               contentType: "image/png",
               customMetadata: {
-                pdfId: params.id.toString(),
+                pdfId: firestoreDocRef.id,
                 originalName: pdfData.name,
                 originalOwnerId: pdfData.ownerId,
               },
@@ -191,23 +356,24 @@ export default function SharedPDFPage() {
 
       const savedPdfData = {
         name: pdfData.name,
-        url: pdfData.url,
+        url: newPdfUrl,
         uploadedBy: pdfData.uploadedBy,
         uploadedAt: new Date(),
         savedBy: user.uid,
-        originalId: params.id.toString(),
+        originalId: pdfId,
         isPubliclyShared: false,
         accessUsers: [user.email],
         thumbnailUrl: thumbnailUrl,
         thumbnailPath: thumbnailPath,
         size: pdfData.size,
         ownerId: user.uid,
+        storagePath: newStoragePath,
       };
 
-      await setDoc(newPdfRef, savedPdfData);
+      await setDoc(firestoreDocRef, savedPdfData);
       console.log("PDF saved successfully:", savedPdfData);
       setIsSaved(true);
-      setSavedPdfId(newPdfRef.id);
+      setSavedPdfId(firestoreDocRef.id);
       setNewName(pdfData.name);
     } catch (err) {
       console.error("Error saving PDF to collection:", err);

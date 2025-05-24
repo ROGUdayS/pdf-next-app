@@ -437,6 +437,15 @@ export default function PDFsPage() {
       return;
     }
 
+    console.log("Starting rename process for PDF:", {
+      pdfId: pdf.id,
+      currentName: pdf.name,
+      newName: newName.trim(),
+      isOwnedPdf: pdf.uploadedBy === user.email,
+      userId: user.uid,
+      storagePath: pdf.storagePath,
+    });
+
     if (!newName.trim()) {
       setError("Please enter a valid name");
       return;
@@ -460,63 +469,113 @@ export default function PDFsPage() {
       // Reset rename mode first
       handleCancelRename();
 
-      if (pdf.uploadedBy === user.email) {
+      // Check ownership using ownerId instead of uploadedBy
+      if (pdf.ownerId === user.uid) {
         // For owned PDFs, update both storage and Firestore
         const newFileName = `${Date.now()}-${newName.trim()}${
           newName.toLowerCase().endsWith(".pdf") ? "" : ".pdf"
         }`;
         const newStoragePath = `pdfs/${user.uid}/${newFileName}`;
 
+        console.log("Preparing storage operation:", {
+          oldPath: pdf.storagePath,
+          newPath: newStoragePath,
+          userId: user.uid,
+          pdfId: pdf.id,
+          isOwner: true,
+        });
+
         if (pdf.storagePath) {
-          // Get the old file reference
-          const oldFileRef = ref(storage, pdf.storagePath);
-          // Create new file reference
-          const newFileRef = ref(storage, newStoragePath);
+          try {
+            // Get the old file reference
+            const oldFileRef = ref(storage, pdf.storagePath);
+            // Create new file reference
+            const newFileRef = ref(storage, newStoragePath);
 
-          // Download the old file
-          const oldFileBlob = await (await fetch(pdf.url)).blob();
+            console.log("Storage references created:", {
+              oldRef: oldFileRef.fullPath,
+              newRef: newFileRef.fullPath,
+            });
 
-          // Upload to new location
-          await uploadBytes(newFileRef, oldFileBlob);
+            // Download the old file
+            console.log("Downloading file from:", pdf.url);
+            const response = await fetch(pdf.url);
+            console.log("Fetch response status:", response.status);
+            const oldFileBlob = await response.blob();
+            console.log("File downloaded, size:", oldFileBlob.size);
 
-          // Get the new URL
-          const newUrl = await getDownloadURL(newFileRef);
+            // Upload to new location with explicit content type
+            console.log("Starting upload to new location");
+            const uploadResult = await uploadBytes(newFileRef, oldFileBlob, {
+              contentType: "application/pdf",
+              customMetadata: {
+                pdfId: pdf.id,
+                originalName: newName.trim(),
+                ownerId: user.uid,
+              },
+            });
+            console.log("Upload completed:", {
+              fullPath: uploadResult.ref.fullPath,
+              metadata: uploadResult.metadata,
+            });
 
-          // Delete the old file
-          await deleteObject(oldFileRef);
+            // Get the new URL
+            const newUrl = await getDownloadURL(newFileRef);
+            console.log("New URL obtained");
 
-          // Update in Firestore
-          await updateDoc(pdfRef, {
-            name: newName.trim(),
-            url: newUrl,
-            storagePath: newStoragePath,
-          });
+            // Delete the old file
+            console.log("Attempting to delete old file:", oldFileRef.fullPath);
+            try {
+              await deleteObject(oldFileRef);
+              console.log("Old file deleted successfully");
+            } catch (deleteError) {
+              console.error("Error deleting old file:", {
+                error: deleteError,
+                path: oldFileRef.fullPath,
+              });
+              // Continue with the process even if delete fails
+            }
+
+            // Update in Firestore
+            console.log("Updating Firestore document");
+            await updateDoc(pdfRef, {
+              name: newName.trim(),
+              url: newUrl,
+              storagePath: newStoragePath,
+            });
+            console.log("Firestore document updated successfully");
+
+            setError("PDF renamed successfully");
+            setTimeout(() => setError(null), 3000);
+          } catch (error) {
+            console.error("Storage operation failed:", {
+              error,
+              phase: error.phase || "unknown",
+              code: error.code || "unknown",
+              message: error.message || "unknown",
+            });
+            throw error;
+          }
         } else {
-          // If no storagePath (legacy data), just update the name
+          console.log("No storage path found, updating only Firestore");
           await updateDoc(pdfRef, {
             name: newName.trim(),
           });
         }
       } else {
-        // For saved shared PDFs, only update the name in Firestore
+        console.log("Updating shared PDF name in Firestore only");
         await updateDoc(pdfRef, {
           name: newName.trim(),
         });
       }
-
-      // Update local state
-      setPdfs((current) => {
-        const newMap = new Map(current);
-        const updatedPdf = { ...pdf, name: newName.trim() };
-        newMap.set(pdf.id, updatedPdf);
-        return newMap;
+    } catch (error) {
+      console.error("Rename operation failed:", {
+        error,
+        pdfId: pdf.id,
+        oldName: pdf.name,
+        newName: newName.trim(),
       });
-
-      setError("PDF renamed successfully");
-      setTimeout(() => setError(null), 3000);
-    } catch (error: any) {
-      console.error("Error renaming PDF:", error);
-      setError(`Failed to rename PDF: ${error.message}`);
+      setError(`Failed to rename PDF: ${error.message || "Unknown error"}`);
 
       // Restore the original PDF in case of error
       setPdfs((current) => {
