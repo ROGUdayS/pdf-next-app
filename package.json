@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node copy-pdf-worker.js && next dev",
-    "build": "node copy-pdf-worker.js && next build",
+    "build": "node copy-pdf-worker.js && SKIP_ENV_VALIDATION=1 next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "node copy-pdf-worker.js"
