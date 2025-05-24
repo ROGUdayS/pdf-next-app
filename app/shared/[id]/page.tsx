@@ -16,6 +16,7 @@ import {
   getDocs,
   deleteDoc,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
 import {
   ref,
@@ -37,6 +38,7 @@ interface SharedPdfData {
   accessUsers: string[];
   ownerId: string;
   storagePath: string;
+  allowSave: boolean;
 }
 
 export default function SharedPDFPage() {
@@ -274,6 +276,22 @@ export default function SharedPDFPage() {
 
     try {
       setIsSaving(true);
+      setError(null);
+
+      // Check if already saved
+      const savedQuery = query(
+        collection(db, "pdfs"),
+        where("originalPdfId", "==", pdfId),
+        where("savedBy", "==", user.uid)
+      );
+      const savedSnapshot = await getDocs(savedQuery);
+
+      if (!savedSnapshot.empty) {
+        setError("You have already saved this PDF");
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+
       // Create a new document in the PDFs collection
       const firestoreDocRef = doc(collection(db, "pdfs"));
 
@@ -326,32 +344,6 @@ export default function SharedPDFPage() {
         } catch (thumbnailError) {
           console.error("Error copying thumbnail:", thumbnailError);
         }
-      } else {
-        // Generate new thumbnail if original doesn't have one
-        try {
-          const newThumbnail = await generatePdfThumbnail(newPdfUrl);
-          if (newThumbnail) {
-            const response = await fetch(newThumbnail);
-            const blob = await response.blob();
-
-            const thumbnailFileName = `${firestoreDocRef.id}.png`;
-            thumbnailPath = `pdfs/${user.uid}/thumbnails/${thumbnailFileName}`;
-            const thumbnailRef = ref(storage, thumbnailPath);
-
-            await uploadBytes(thumbnailRef, blob, {
-              contentType: "image/png",
-              customMetadata: {
-                pdfId: firestoreDocRef.id,
-                originalName: pdfData.name,
-                originalOwnerId: pdfData.ownerId,
-              },
-            });
-
-            thumbnailUrl = await getDownloadURL(thumbnailRef);
-          }
-        } catch (thumbnailError) {
-          console.error("Error generating thumbnail:", thumbnailError);
-        }
       }
 
       const savedPdfData = {
@@ -360,7 +352,7 @@ export default function SharedPDFPage() {
         uploadedBy: pdfData.uploadedBy,
         uploadedAt: new Date(),
         savedBy: user.uid,
-        originalId: pdfId,
+        originalPdfId: pdfId,
         isPubliclyShared: false,
         accessUsers: [user.email],
         thumbnailUrl: thumbnailUrl,
@@ -368,6 +360,7 @@ export default function SharedPDFPage() {
         size: pdfData.size,
         ownerId: user.uid,
         storagePath: newStoragePath,
+        allowSave: pdfData.allowSave,
       };
 
       await setDoc(firestoreDocRef, savedPdfData);
@@ -385,27 +378,87 @@ export default function SharedPDFPage() {
 
   useEffect(() => {
     const fetchPdfData = async () => {
+      if (!params.id) return;
+
       try {
-        const response = await fetch(`/api/shared-pdf/${params.id}`);
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "Failed to load PDF");
+        setIsLoading(true);
+        setError(null);
+
+        // Get the PDF document
+        const pdfDoc = doc(db, "pdfs", params.id.toString());
+        const pdfSnapshot = await getDoc(pdfDoc);
+
+        if (!pdfSnapshot.exists()) {
+          setError("PDF not found");
+          setIsLoading(false);
+          return;
         }
-        const data = await response.json();
-        setPdfData(data);
+
+        const data = pdfSnapshot.data();
+
+        // Check if the PDF is publicly shared
+        if (!data.isPubliclyShared) {
+          // If user is not authenticated, show error
+          if (!user) {
+            setError("Please log in to view this PDF");
+            setIsLoading(false);
+            return;
+          }
+
+          // If user is not in accessUsers and not the owner, show error
+          if (
+            !data.accessUsers.includes(user.email) &&
+            data.ownerId !== user.uid
+          ) {
+            setError("You don't have permission to view this PDF");
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // If user is authenticated and not already in accessUsers, add them
+        if (
+          user?.email &&
+          !data.accessUsers.includes(user.email) &&
+          data.ownerId !== user.uid
+        ) {
+          try {
+            await updateDoc(pdfDoc, {
+              accessUsers: [...data.accessUsers, user.email],
+            });
+            console.log("Added user to shared list:", user.email);
+            // Update the data object with the new accessUsers list
+            data.accessUsers = [...data.accessUsers, user.email];
+          } catch (error) {
+            console.error("Error adding user to shared list:", error);
+            // Continue showing the PDF even if adding to shared list fails
+          }
+        }
+
+        setPdfData({
+          id: pdfSnapshot.id,
+          name: data.name || "Untitled",
+          url: data.url,
+          uploadedBy: data.uploadedBy || "Unknown",
+          uploadedAt: data.uploadedAt?.toDate?.() || new Date().toISOString(),
+          isPubliclyShared: data.isPubliclyShared || false,
+          thumbnailUrl: data.thumbnailUrl || null,
+          size: data.size || 0,
+          accessUsers: data.accessUsers || [],
+          ownerId: data.ownerId,
+          storagePath: data.storagePath,
+          allowSave: data.allowSave || false,
+        });
       } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Failed to load PDF");
-        }
+        console.error("Error fetching PDF:", err);
+        setError("Failed to load PDF");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPdfData();
-  }, [params.id]);
+  }, [params.id, user]);
 
   if (isLoading) {
     return (
@@ -449,6 +502,11 @@ export default function SharedPDFPage() {
               <div className="text-sm text-gray-500">
                 Shared by: {pdfData.uploadedBy}
               </div>
+              {!pdfData.allowSave && (
+                <div className="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md inline-block">
+                  View only - Saving not allowed
+                </div>
+              )}
             </div>
 
             {/* Debug Info - Remove in production */}
@@ -519,11 +577,11 @@ export default function SharedPDFPage() {
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : pdfData.allowSave ? (
               <div className="text-sm text-gray-600">
                 Save this PDF to your collection to rename or delete your copy.
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Rename Dialog */}
@@ -594,10 +652,12 @@ export default function SharedPDFPage() {
             fileName={pdfData.name}
             canShare={false}
             isAuthenticated={!!user}
-            canDownload={!!user}
-            canOpenInNewTab={!!user}
+            canDownload={!!user && pdfData.allowSave}
+            canOpenInNewTab={!!user && pdfData.allowSave}
             onLogin={() => router.push("/login")}
-            onSaveToCollection={handleSaveToCollection}
+            onSaveToCollection={
+              pdfData.allowSave ? handleSaveToCollection : undefined
+            }
             isSaved={isSaved}
           />
         </div>

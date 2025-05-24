@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import { useState } from "react";
+import { Dialog, Transition, Switch } from "@headlessui/react";
+import { Fragment } from "react";
 
 interface ShareDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onShareViaEmail: (email: string) => Promise<void>;
-  onShareViaLink: () => Promise<string>;
+  onShareViaEmail: (email: string, allowSave: boolean) => Promise<void>;
+  onShareViaLink: (allowSave: boolean) => Promise<string>;
   pdfName: string;
 }
 
@@ -15,13 +15,14 @@ export default function ShareDialog({
   onClose,
   onShareViaEmail,
   onShareViaLink,
-  pdfName
+  pdfName,
 }: ShareDialogProps) {
-  const [email, setEmail] = useState('');
-  const [shareLink, setShareLink] = useState('');
+  const [email, setEmail] = useState("");
+  const [shareLink, setShareLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [allowSave, setAllowSave] = useState(false);
 
   const handleEmailShare = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,11 +33,11 @@ export default function ShareDialog({
     setSuccess(null);
 
     try {
-      await onShareViaEmail(email);
+      await onShareViaEmail(email, allowSave);
       setSuccess(`Successfully shared "${pdfName}" with ${email}`);
-      setEmail('');
+      setEmail("");
     } catch (err: any) {
-      setError(err.message || 'Failed to share PDF');
+      setError(err.message || "Failed to share PDF");
     } finally {
       setIsLoading(false);
     }
@@ -46,24 +47,23 @@ export default function ShareDialog({
     setIsLoading(true);
     setError(null);
     try {
-      const link = await onShareViaLink();
+      const link = await onShareViaLink(allowSave);
       setShareLink(link);
-      setSuccess('Share link generated successfully');
+      setSuccess("Share link generated successfully");
     } catch (err: any) {
-      console.error('🔥 Firestore update failed:', err);
-      setError(err.message || 'Failed to generate share link');
+      console.error("🔥 Firestore update failed:", err);
+      setError(err.message || "Failed to generate share link");
     } finally {
       setIsLoading(false);
     }
   };
-  
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
-      setSuccess('Link copied to clipboard!');
+      setSuccess("Link copied to clipboard!");
     } catch (err) {
-      setError('Failed to copy link');
+      setError("Failed to copy link");
     }
   };
 
@@ -101,6 +101,33 @@ export default function ShareDialog({
                   Share "{pdfName}"
                 </Dialog.Title>
 
+                {/* Permissions Section */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      Allow recipients to save PDF
+                    </span>
+                    <Switch
+                      checked={allowSave}
+                      onChange={setAllowSave}
+                      className={`${
+                        allowSave ? "bg-blue-600" : "bg-gray-200"
+                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                    >
+                      <span
+                        className={`${
+                          allowSave ? "translate-x-6" : "translate-x-1"
+                        } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                      />
+                    </Switch>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {allowSave
+                      ? "Recipients can save, download, and open the PDF in a new tab"
+                      : "Recipients can only view the PDF"}
+                  </p>
+                </div>
+
                 {/* Error/Success Messages */}
                 {error && (
                   <div className="mt-2 p-2 bg-red-50 text-red-500 rounded-md text-sm">
@@ -115,7 +142,9 @@ export default function ShareDialog({
 
                 {/* Share via Email */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900">Share via Email</h4>
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Share via Email
+                  </h4>
                   <form onSubmit={handleEmailShare} className="mt-2">
                     <div className="flex gap-2">
                       <input
@@ -139,7 +168,9 @@ export default function ShareDialog({
 
                 {/* Share via Link */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900">Share via Link</h4>
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Share via Link
+                  </h4>
                   <div className="mt-2">
                     {shareLink ? (
                       <div className="flex gap-2">
@@ -183,4 +214,4 @@ export default function ShareDialog({
       </Dialog>
     </Transition>
   );
-} 
+}

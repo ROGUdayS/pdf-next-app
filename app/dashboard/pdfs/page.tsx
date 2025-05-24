@@ -24,6 +24,7 @@ import {
   doc,
   orderBy,
   onSnapshot,
+  setDoc,
 } from "firebase/firestore";
 import Image from "next/image";
 import PDFViewer from "@/app/components/PDFViewer";
@@ -43,6 +44,7 @@ interface PdfFile {
   thumbnailPath?: string;
   storagePath?: string;
   isPubliclyShared?: boolean;
+  allowSave: boolean;
 }
 
 // Cache for storing thumbnails - move outside component to persist between renders
@@ -82,6 +84,7 @@ export default function PDFsPage() {
         thumbnailUrl: data.thumbnailUrl,
         thumbnailPath: data.thumbnailPath,
         storagePath: data.storagePath,
+        allowSave: data.allowSave,
       };
     }
 
@@ -141,6 +144,7 @@ export default function PDFsPage() {
               thumbnailUrl: thumbnailUrl,
               thumbnailPath: thumbnailPath,
               storagePath: data.storagePath,
+              allowSave: data.allowSave,
             };
           } catch (thumbnailError) {
             console.error("Error saving thumbnail:", thumbnailError);
@@ -164,13 +168,13 @@ export default function PDFsPage() {
       thumbnailUrl: data.thumbnailUrl,
       thumbnailPath: data.thumbnailPath,
       storagePath: data.storagePath,
+      allowSave: data.allowSave,
     };
   };
 
   // Effect to set up real-time listeners for PDFs
   useEffect(() => {
     let ownedUnsubscribe: (() => void) | null = null;
-    let sharedUnsubscribe: (() => void) | null = null;
     let isMounted = true;
 
     const setupRealTimeListeners = async () => {
@@ -180,17 +184,10 @@ export default function PDFsPage() {
       }
 
       try {
-        // Query for owned PDFs
+        // Query for owned PDFs and saved copies (where user is the owner)
         const ownedQuery = query(
           collection(db, "pdfs"),
           where("ownerId", "==", user.uid),
-          orderBy("uploadedAt", "desc")
-        );
-
-        // Query for shared PDFs
-        const sharedQuery = query(
-          collection(db, "pdfs"),
-          where("accessUsers", "array-contains", user.email),
           orderBy("uploadedAt", "desc")
         );
 
@@ -210,10 +207,10 @@ export default function PDFsPage() {
               processedPdfs.forEach((pdf) => {
                 newMap.set(pdf.id, pdf);
               });
-              // Remove any owned PDFs that no longer exist
+              // Remove any PDFs that no longer exist
               const ownedIds = new Set(processedPdfs.map((pdf) => pdf.id));
-              for (const [id, pdf] of newMap) {
-                if (pdf.ownerId === user.uid && !ownedIds.has(id)) {
+              for (const [id] of newMap) {
+                if (!ownedIds.has(id)) {
                   newMap.delete(id);
                 }
               }
@@ -223,40 +220,6 @@ export default function PDFsPage() {
           (error) => {
             console.error("Error in owned PDFs listener:", error);
             setError("Error loading your PDFs");
-          }
-        );
-
-        // Set up real-time listener for shared PDFs
-        sharedUnsubscribe = onSnapshot(
-          sharedQuery,
-          async (snapshot) => {
-            if (!isMounted) return;
-
-            const processedPdfs = await Promise.all(
-              snapshot.docs.map(processPdf)
-            );
-
-            setPdfs((current) => {
-              const newMap = new Map(current);
-              // Update or add shared PDFs
-              processedPdfs.forEach((pdf) => {
-                if (!newMap.has(pdf.id) || pdf.ownerId !== user.uid) {
-                  newMap.set(pdf.id, pdf);
-                }
-              });
-              // Remove any shared PDFs that no longer exist
-              const sharedIds = new Set(processedPdfs.map((pdf) => pdf.id));
-              for (const [id, pdf] of newMap) {
-                if (pdf.ownerId !== user.uid && !sharedIds.has(id)) {
-                  newMap.delete(id);
-                }
-              }
-              return newMap;
-            });
-          },
-          (error) => {
-            console.error("Error in shared PDFs listener:", error);
-            setError("Error loading shared PDFs");
           }
         );
 
@@ -273,7 +236,6 @@ export default function PDFsPage() {
     return () => {
       isMounted = false;
       if (ownedUnsubscribe) ownedUnsubscribe();
-      if (sharedUnsubscribe) sharedUnsubscribe();
     };
   }, [user]);
 
@@ -648,7 +610,7 @@ export default function PDFsPage() {
   };
 
   // Add sharing functions
-  const handleShareViaEmail = async (email: string) => {
+  const handleShareViaEmail = async (email: string, allowSave: boolean) => {
     if (!sharingPdf || !user) return;
 
     try {
@@ -662,6 +624,7 @@ export default function PDFsPage() {
 
       await updateDoc(pdfRef, {
         accessUsers: [...sharingPdf.accessUsers, email],
+        allowSave: allowSave,
       });
 
       // Update local state
@@ -670,6 +633,7 @@ export default function PDFsPage() {
         const updatedPdf = {
           ...sharingPdf,
           accessUsers: [...sharingPdf.accessUsers, email],
+          allowSave: allowSave,
         };
         newMap.set(sharingPdf.id, updatedPdf);
         return newMap;
@@ -679,7 +643,7 @@ export default function PDFsPage() {
     }
   };
 
-  const handleShareViaLink = async () => {
+  const handleShareViaLink = async (allowSave: boolean) => {
     if (!sharingPdf || !user) return "";
 
     try {
@@ -687,12 +651,17 @@ export default function PDFsPage() {
       const pdfRef = doc(db, "pdfs", sharingPdf.id);
       await updateDoc(pdfRef, {
         isPubliclyShared: true,
+        allowSave: allowSave,
       });
 
       // Update local state
       setPdfs((current) => {
         const newMap = new Map(current);
-        const updatedPdf = { ...sharingPdf, isPubliclyShared: true };
+        const updatedPdf = {
+          ...sharingPdf,
+          isPubliclyShared: true,
+          allowSave: allowSave,
+        };
         newMap.set(sharingPdf.id, updatedPdf);
         return newMap;
       });
@@ -701,6 +670,105 @@ export default function PDFsPage() {
       return `${window.location.origin}/shared/${sharingPdf.id}`;
     } catch (error: any) {
       throw new Error("Failed to generate share link: " + error.message);
+    }
+  };
+
+  const handleSaveToCollection = async () => {
+    if (!user || !selectedPdf) return;
+
+    try {
+      setError(null);
+
+      // First check if this PDF is already saved
+      const savedQuery = query(
+        collection(db, "pdfs"),
+        where("originalPdfId", "==", selectedPdf.id),
+        where("ownerId", "==", user.uid)
+      );
+      const savedSnapshot = await getDocs(savedQuery);
+
+      // If already saved, just show a message
+      if (!savedSnapshot.empty) {
+        setError("This PDF is already saved to your collection");
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+
+      // Create a new document in the PDFs collection
+      const firestoreDocRef = doc(collection(db, "pdfs"));
+
+      // First, download the PDF file
+      const pdfResponse = await fetch(selectedPdf.url);
+      const pdfBlob = await pdfResponse.blob();
+
+      // Create a new storage path for the user's copy
+      const fileName = `${Date.now()}-${selectedPdf.name}`;
+      const newStoragePath = `pdfs/${user.uid}/${fileName}`;
+      const storageRef = ref(storage, newStoragePath);
+
+      // Upload the PDF to the user's storage bucket
+      await uploadBytes(storageRef, pdfBlob, {
+        contentType: "application/pdf",
+        customMetadata: {
+          originalPdfId: selectedPdf.id,
+          originalName: selectedPdf.name,
+          originalOwnerId: selectedPdf.ownerId,
+        },
+      });
+
+      // Get the URL for the new PDF
+      const newPdfUrl = await getDownloadURL(storageRef);
+
+      // Handle thumbnail
+      let thumbnailUrl = null;
+      let thumbnailPath = null;
+
+      // If original has thumbnail, copy it
+      if (selectedPdf.thumbnailUrl) {
+        try {
+          const thumbnailResponse = await fetch(selectedPdf.thumbnailUrl);
+          const thumbnailBlob = await thumbnailResponse.blob();
+
+          const thumbnailFileName = `${firestoreDocRef.id}.png`;
+          thumbnailPath = `pdfs/${user.uid}/thumbnails/${thumbnailFileName}`;
+          const thumbnailRef = ref(storage, thumbnailPath);
+
+          await uploadBytes(thumbnailRef, thumbnailBlob, {
+            contentType: "image/png",
+            customMetadata: {
+              pdfId: firestoreDocRef.id,
+              originalName: selectedPdf.name,
+              originalOwnerId: selectedPdf.ownerId,
+            },
+          });
+
+          thumbnailUrl = await getDownloadURL(thumbnailRef);
+        } catch (thumbnailError) {
+          console.error("Error copying thumbnail:", thumbnailError);
+        }
+      }
+
+      const savedPdfData = {
+        name: selectedPdf.name,
+        url: newPdfUrl,
+        uploadedBy: user.email,
+        uploadedAt: Timestamp.now(),
+        size: pdfBlob.size,
+        accessUsers: [user.email],
+        ownerId: user.uid,
+        originalPdfId: selectedPdf.id,
+        thumbnailUrl: thumbnailUrl,
+        thumbnailPath: thumbnailPath,
+        storagePath: newStoragePath,
+        allowSave: selectedPdf.allowSave,
+      };
+
+      await setDoc(firestoreDocRef, savedPdfData);
+      setError("PDF saved successfully");
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      console.error("Error saving PDF to collection:", err);
+      setError("Failed to save PDF to your collection");
     }
   };
 

@@ -51,6 +51,7 @@ export default function PDFViewer({
     height: 0,
   });
   const [fitMode, setFitMode] = useState<"width" | "page">("width");
+  const [isSaving, setIsSaving] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -223,6 +224,21 @@ export default function PDFViewer({
     setRotation((r) => (r + deg) % 360);
   }
 
+  const handleSaveToCollection = async () => {
+    if (!onSaveToCollection || isSaved || isSaving) return;
+
+    try {
+      setIsSaving(true);
+      await onSaveToCollection();
+    } catch (err) {
+      console.error("Error saving PDF:", err);
+      setError("Failed to save PDF");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!pdfUrl) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -360,24 +376,31 @@ export default function PDFViewer({
           <div className="flex items-center space-x-4">
             {isAuthenticated && onSaveToCollection && !isSaved && (
               <button
-                onClick={onSaveToCollection}
-                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center space-x-2"
+                onClick={handleSaveToCollection}
+                disabled={isSaving}
+                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center space-x-2 disabled:opacity-50"
                 title="Save to My PDFs"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span>Save to My PDFs</span>
+                {isSaving ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    <span>Save to My PDFs</span>
+                  </>
+                )}
               </button>
             )}
 
