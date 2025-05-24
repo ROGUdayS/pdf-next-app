@@ -1,10 +1,18 @@
 "use client";
 
-import * as pdfjsLib from "pdfjs-dist";
+// Dynamic import to ensure PDF.js only loads on client side
+let pdfjsLib: typeof import("pdfjs-dist") | null = null;
 
-// Configure PDF.js worker
-if (typeof window !== "undefined") {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker/pdf.worker.min.js";
+async function loadPdfjs() {
+  if (typeof window === "undefined") return null;
+
+  if (!pdfjsLib) {
+    pdfjsLib = await import("pdfjs-dist");
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker/pdf.worker.min.js";
+  }
+
+  return pdfjsLib;
 }
 
 export async function generatePdfThumbnail(
@@ -15,8 +23,12 @@ export async function generatePdfThumbnail(
   try {
     console.log("Starting thumbnail generation for:", url);
 
+    // Dynamically load PDF.js
+    const pdfjs = await loadPdfjs();
+    if (!pdfjs) return undefined;
+
     // Create loading task with range request enabled
-    const loadingTask = pdfjsLib.getDocument({
+    const loadingTask = pdfjs.getDocument({
       url: url,
       rangeChunkSize: 65536,
       disableRange: false,
