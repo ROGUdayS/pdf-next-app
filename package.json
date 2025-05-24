@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node copy-pdf-worker.js && next dev",
-    "build": "node copy-pdf-worker.js && SKIP_ENV_VALIDATION=1 next build",
+    "build": "node copy-pdf-worker.js && SKIP_ENV_VALIDATION=1 npx next build",
+    "build:firebase": "node scripts/setup-firebase-env.js && node copy-pdf-worker.js && SKIP_ENV_VALIDATION=1 npx next build",
+    "deploy:firebase": "node scripts/deploy-firebase.js",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "node copy-pdf-worker.js"
