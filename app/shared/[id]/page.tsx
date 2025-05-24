@@ -398,8 +398,24 @@ export default function SharedPDFPage() {
 
         // Check if the PDF is publicly shared
         if (!data.isPubliclyShared) {
-          // If user is not authenticated, show error
+          // If user is not authenticated and the PDF is not public, show error
           if (!user) {
+            // Don't redirect, just show the login prompt
+            setPdfData({
+              id: pdfSnapshot.id,
+              name: data.name || "Untitled",
+              url: data.url,
+              uploadedBy: data.uploadedBy || "Unknown",
+              uploadedAt:
+                data.uploadedAt?.toDate?.() || new Date().toISOString(),
+              isPubliclyShared: false,
+              thumbnailUrl: data.thumbnailUrl || null,
+              size: data.size || 0,
+              accessUsers: data.accessUsers || [],
+              ownerId: data.ownerId,
+              storagePath: data.storagePath,
+              allowSave: data.allowSave || false,
+            });
             setError("Please log in to view this PDF");
             setIsLoading(false);
             return;
@@ -468,20 +484,33 @@ export default function SharedPDFPage() {
     );
   }
 
-  if (error || !pdfData) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="text-red-500 mb-4">{error || "PDF not found"}</div>
-        {!user && (
+        <div className="text-red-500 mb-4">{error}</div>
+        {!user && pdfData && !pdfData.isPubliclyShared && (
           <div className="mb-4">
-            <button
-              onClick={() => router.push("/login")}
+            <Link
+              href={`/signin?redirect=${encodeURIComponent(
+                `/shared/${params.id}`
+              )}`}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
               Log in to access
-            </button>
+            </Link>
           </div>
         )}
+        <Link href="/" className="text-blue-500 hover:text-blue-600 underline">
+          Go to Home
+        </Link>
+      </div>
+    );
+  }
+
+  if (!pdfData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="text-red-500 mb-4">PDF not found</div>
         <Link href="/" className="text-blue-500 hover:text-blue-600 underline">
           Go to Home
         </Link>
@@ -654,11 +683,12 @@ export default function SharedPDFPage() {
             isAuthenticated={!!user}
             canDownload={!!user && pdfData.allowSave}
             canOpenInNewTab={!!user && pdfData.allowSave}
-            onLogin={() => router.push("/login")}
+            onLogin={() => router.push("/signin")}
             onSaveToCollection={
               pdfData.allowSave ? handleSaveToCollection : undefined
             }
             isSaved={isSaved}
+            pdfId={pdfData.id}
           />
         </div>
       </div>

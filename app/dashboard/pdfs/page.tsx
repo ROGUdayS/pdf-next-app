@@ -29,6 +29,7 @@ import {
 import Image from "next/image";
 import PDFViewer from "@/app/components/PDFViewer";
 import ShareDialog from "@/app/components/ShareDialog";
+import { FirebaseError } from "firebase/app";
 
 interface PdfFile {
   id: string;
@@ -618,28 +619,58 @@ export default function PDFsPage() {
       const pdfRef = doc(db, "pdfs", sharingPdf.id);
 
       // Check if the email is already in the access list
-      if (sharingPdf.accessUsers.includes(email)) {
-        throw new Error("This user already has access to the PDF");
+      const isExistingUser = sharingPdf.accessUsers.includes(email);
+
+      // Only update Firestore if it's a new user or allowSave has changed
+      if (!isExistingUser || sharingPdf.allowSave !== allowSave) {
+        await updateDoc(pdfRef, {
+          accessUsers: isExistingUser
+            ? sharingPdf.accessUsers
+            : [...sharingPdf.accessUsers, email],
+          allowSave: allowSave,
+        });
       }
 
-      await updateDoc(pdfRef, {
-        accessUsers: [...sharingPdf.accessUsers, email],
-        allowSave: allowSave,
+      // Always send email notification
+      const shareUrl = `${window.location.origin}/shared/${sharingPdf.id}`;
+      const response = await fetch("/api/share-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipientEmail: email,
+          pdfName: sharingPdf.name,
+          sharedByEmail: user.email,
+          pdfUrl: shareUrl,
+          allowSave: allowSave,
+        }),
       });
 
-      // Update local state
-      setPdfs((current) => {
-        const newMap = new Map(current);
-        const updatedPdf = {
-          ...sharingPdf,
-          accessUsers: [...sharingPdf.accessUsers, email],
-          allowSave: allowSave,
-        };
-        newMap.set(sharingPdf.id, updatedPdf);
-        return newMap;
-      });
-    } catch (error: any) {
-      throw new Error("Failed to share PDF: " + error.message);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send share notification");
+      }
+
+      // Update local state only if needed
+      if (!isExistingUser || sharingPdf.allowSave !== allowSave) {
+        setPdfs((current) => {
+          const newMap = new Map(current);
+          const updatedPdf = {
+            ...sharingPdf,
+            accessUsers: isExistingUser
+              ? sharingPdf.accessUsers
+              : [...sharingPdf.accessUsers, email],
+            allowSave: allowSave,
+          };
+          newMap.set(sharingPdf.id, updatedPdf);
+          return newMap;
+        });
+      }
+    } catch (error: Error | FirebaseError | unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to share PDF";
+      throw new Error("Failed to share PDF: " + errorMessage);
     }
   };
 

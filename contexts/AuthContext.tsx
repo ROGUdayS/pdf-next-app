@@ -72,8 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the ID token
       const token = await user.getIdToken();
 
-      // Store the token in a cookie
-      document.cookie = `__firebase_auth_token=${token}; path=/`;
+      // Store the token in a cookie with proper settings
+      document.cookie = `__firebase_auth_token=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
 
       // If on an auth page, redirect to dashboard
       if (
