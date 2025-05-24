@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   User,
   signInWithEmailAndPassword,
@@ -9,11 +9,19 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  UserCredential
-} from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+  UserCredential,
+} from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+  limit,
+} from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 
 interface AuthContextType {
   user: User | null;
@@ -44,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pdfStats, setPdfStats] = useState({
     ownedCount: 0,
     sharedCount: 0,
-    recentPdfs: [] as RecentPdf[]
+    recentPdfs: [] as RecentPdf[],
   });
   const router = useRouter();
 
@@ -55,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPdfStats({
           ownedCount: 0,
           sharedCount: 0,
-          recentPdfs: []
+          recentPdfs: [],
         });
         setLoading(false);
         return;
@@ -63,13 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Get the ID token
       const token = await user.getIdToken();
-      
+
       // Store the token in a cookie
       document.cookie = `__firebase_auth_token=${token}; path=/`;
-      
+
       // If on an auth page, redirect to dashboard
-      if (window.location.pathname === '/signin' || window.location.pathname === '/signup') {
-        router.push('/dashboard');
+      if (
+        window.location.pathname === "/signin" ||
+        window.location.pathname === "/signup"
+      ) {
+        router.push("/dashboard");
       }
     });
 
@@ -82,49 +93,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubscribeRecent: (() => void) | null = null;
 
     if (user) {
+      console.log("Auth state:", {
+        uid: user.uid,
+        email: user.email,
+        isAnonymous: user.isAnonymous,
+        emailVerified: user.emailVerified,
+      });
+
       // Listen for owned PDFs count
       const ownedQuery = query(
-        collection(db, 'pdfs'),
-        where('ownerId', '==', user.uid)
+        collection(db, "pdfs"),
+        where("ownerId", "==", user.uid)
       );
-      unsubscribeOwned = onSnapshot(ownedQuery, (snapshot) => {
-        setPdfStats(prev => ({ ...prev, ownedCount: snapshot.size }));
-      });
+      unsubscribeOwned = onSnapshot(
+        ownedQuery,
+        (snapshot) => {
+          console.log("Owned PDFs query result:", { size: snapshot.size });
+          setPdfStats((prev) => ({ ...prev, ownedCount: snapshot.size }));
+        },
+        (error: FirebaseError) => {
+          console.error("Error in owned PDFs query:", error);
+        }
+      );
 
       // Listen for shared PDFs count
       const sharedQuery = query(
-        collection(db, 'pdfs'),
-        where('accessUsers', 'array-contains', user.email)
+        collection(db, "pdfs"),
+        where("accessUsers", "array-contains", user.email)
       );
-      unsubscribeShared = onSnapshot(sharedQuery, (snapshot) => {
-        setPdfStats(prev => ({ ...prev, sharedCount: snapshot.size }));
-      });
+      unsubscribeShared = onSnapshot(
+        sharedQuery,
+        (snapshot) => {
+          console.log("Shared PDFs query result:", { size: snapshot.size });
+          setPdfStats((prev) => ({ ...prev, sharedCount: snapshot.size }));
+        },
+        (error: FirebaseError) => {
+          console.error("Error in shared PDFs query:", error);
+        }
+      );
 
       // Listen for recent PDFs
       const recentQuery = query(
-        collection(db, 'pdfs'),
-        where('accessUsers', 'array-contains', user.email),
-        orderBy('uploadedAt', 'desc'),
+        collection(db, "pdfs"),
+        where("accessUsers", "array-contains", user.email),
+        orderBy("uploadedAt", "desc"),
         limit(3)
       );
-      unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
-        const recentPdfs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name,
-          uploadedAt: doc.data().uploadedAt.toDate(),
-          uploadedBy: doc.data().uploadedBy
-        }));
-        setPdfStats(prev => ({ ...prev, recentPdfs }));
-      });
+      unsubscribeRecent = onSnapshot(
+        recentQuery,
+        (snapshot) => {
+          console.log("Recent PDFs query result:", { size: snapshot.size });
+          const recentPdfs = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            name: doc.data().name,
+            uploadedAt: doc.data().uploadedAt.toDate(),
+            uploadedBy: doc.data().uploadedBy,
+          }));
+          setPdfStats((prev) => ({ ...prev, recentPdfs }));
+        },
+        (error: FirebaseError) => {
+          console.error("Error in recent PDFs query:", error);
+        }
+      );
 
       setLoading(false);
     } else {
+      console.log("No user authenticated");
       // Remove the token cookie
-      document.cookie = '__firebase_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-      
+      document.cookie =
+        "__firebase_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+
       // If on a protected page, redirect to signin
-      if (window.location.pathname.startsWith('/dashboard')) {
-        router.push('/signin');
+      if (window.location.pathname.startsWith("/dashboard")) {
+        router.push("/signin");
       }
     }
 
@@ -137,7 +178,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       return userCredential;
     } catch (error: any) {
       throw new Error(error.message);
@@ -164,7 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
-      router.push('/');
+      router.push("/");
     } catch (error: any) {
       throw new Error(error.message);
     }
@@ -179,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signInWithGoogle,
         logout,
-        pdfStats
+        pdfStats,
       }}
     >
       {!loading && children}
@@ -190,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-} 
+}

@@ -1,43 +1,63 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Document, Page } from 'react-pdf';
-import { getAuth } from 'firebase/auth';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-import '../lib/pdfjs-config';
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Document, Page } from "react-pdf";
+import { getAuth } from "firebase/auth";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
+import "../lib/pdfjs-config";
 
 interface PDFViewerProps {
   fileUrl: string;
   onClose: () => void;
   fileName?: string;
+  onShare?: () => void;
+  canShare?: boolean;
+  canDownload?: boolean;
+  canOpenInNewTab?: boolean;
+  isAuthenticated?: boolean;
+  onLogin?: () => void;
 }
 
 export default function PDFViewer({
   fileUrl,
   onClose,
-  fileName = 'document.pdf',
+  fileName = "document.pdf",
+  onShare,
+  canShare = false,
+  canDownload = true,
+  canOpenInNewTab = true,
+  isAuthenticated = true,
+  onLogin,
 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSideBySide, setIsSideBySide] = useState(false);
-  const [jumpToPage, setJumpToPage] = useState('');
+  const [jumpToPage, setJumpToPage] = useState("");
   const [rotation, setRotation] = useState(0);
-  const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }>({
+  const [pageDimensions, setPageDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({
     width: 0,
     height: 0,
   });
-  const [fitMode, setFitMode] = useState<'width' | 'page'>('width');
+  const [fitMode, setFitMode] = useState<"width" | "page">("width");
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Capture the rendered page dimensions (already scaled & rotated)
-  const handlePageLoadSuccess = ({ width, height }: { width: number; height: number }) => {
+  const handlePageLoadSuccess = ({
+    width,
+    height,
+  }: {
+    width: number;
+    height: number;
+  }) => {
     setPageDimensions({ width, height });
   };
 
@@ -45,10 +65,10 @@ export default function PDFViewer({
   useEffect(() => {
     const onResize = () => {
       setScale(1.0);
-      setFitMode('width');
+      setFitMode("width");
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Fit logic, now accounts for 90°/270° by swapping intrinsic dimensions
@@ -74,25 +94,26 @@ export default function PDFViewer({
       [intrinsicW, intrinsicH] = [intrinsicH, intrinsicW];
     }
 
-    if (fitMode === 'width') {
+    if (fitMode === "width") {
       // fit to page
       const scaleW = availW / intrinsicW;
       const scaleH = containerH / intrinsicH;
       setScale(Math.min(scaleW, scaleH));
-      setFitMode('page');
+      setFitMode("page");
     } else {
       // fit to width
       setScale(availW / intrinsicW);
-      setFitMode('width');
+      setFitMode("width");
     }
   }
 
   // PDF.js options
   const options = useMemo(
     () => ({
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
       cMapPacked: true,
-      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
+      standardFontDataUrl:
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/",
     }),
     []
   );
@@ -100,51 +121,56 @@ export default function PDFViewer({
   // Fullscreen listener
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
-  // Fetch Firebase token
+  // Fetch Firebase token only if authenticated
   useEffect(() => {
+    if (!isAuthenticated) {
+      setAuthToken(null);
+      return;
+    }
+
     (async () => {
       try {
         const auth = getAuth();
         const token = await auth.currentUser?.getIdToken();
         setAuthToken(token || null);
       } catch {
-        setError('Authentication error. Please try again.');
+        setError("Authentication error. Please try again.");
       }
     })();
-  }, []);
+  }, [isAuthenticated]);
 
-  // Build proxied URL
-  const proxiedUrl = useMemo(() => {
+  // Build URL - use proxy for authenticated users, direct URL for non-authenticated
+  const pdfUrl = useMemo(() => {
+    if (!isAuthenticated) {
+      return fileUrl;
+    }
     if (!authToken) return null;
-    const u = new URL('/api/pdf-proxy', window.location.origin);
-    u.searchParams.set('url', fileUrl);
-    u.searchParams.set('token', authToken);
+    const u = new URL("/api/pdf-proxy", window.location.origin);
+    u.searchParams.set("url", fileUrl);
+    u.searchParams.set("token", authToken);
     return u.toString();
-  }, [fileUrl, authToken]);
+  }, [fileUrl, authToken, isAuthenticated]);
 
   // Reset state on file change
   useEffect(() => {
     setError(null);
-    setIsLoading(true);
     setPageNumber(1);
     setScale(1.0);
-    setFitMode('width');
+    setFitMode("width");
   }, [fileUrl]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setIsLoading(false);
     setError(null);
   };
 
   function onDocumentLoadError(e: Error) {
     console.error(e);
-    setError('Failed to load PDF. Please try again.');
-    setIsLoading(false);
+    setError("Failed to load PDF. Please try again.");
   }
 
   function changePage(offset: number) {
@@ -156,13 +182,13 @@ export default function PDFViewer({
     const p = parseInt(jumpToPage);
     if (!isNaN(p) && p >= 1 && p <= (numPages || 1)) {
       setPageNumber(p);
-      setJumpToPage('');
+      setJumpToPage("");
     }
   }
 
   function changeScale(delta: number) {
     setScale((s) => Math.max(0.1, Math.min(2.0, s + delta)));
-    setFitMode('width');
+    setFitMode("width");
   }
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -170,14 +196,14 @@ export default function PDFViewer({
   }
 
   async function toggleFullscreen() {
-    const viewer = document.getElementById('pdf-viewer-container');
+    const viewer = document.getElementById("pdf-viewer-container");
     if (!viewer) return;
     if (!document.fullscreenElement) await viewer.requestFullscreen();
     else await document.exitFullscreen();
   }
 
   function handleDownload() {
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = fileUrl;
     a.download = fileName;
     document.body.append(a);
@@ -186,14 +212,14 @@ export default function PDFViewer({
   }
 
   function openInNewTab() {
-    window.open(fileUrl, '_blank');
+    window.open(fileUrl, "_blank");
   }
 
   function rotatePages(deg: number) {
     setRotation((r) => (r + deg) % 360);
   }
 
-  if (!proxiedUrl) {
+  if (!pdfUrl) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
         <div className="bg-white rounded-lg p-8">
@@ -212,7 +238,7 @@ export default function PDFViewer({
         id="pdf-viewer-container"
         ref={containerRef}
         className={`bg-gray-200 rounded-lg p-4 max-w-6xl w-full flex flex-col ${
-          isFullscreen ? 'h-screen' : 'max-h-[90vh]'
+          isFullscreen ? "h-screen" : "max-h-[90vh]"
         }`}
       >
         {/* Toolbar */}
@@ -226,7 +252,10 @@ export default function PDFViewer({
             >
               Previous
             </button>
-            <form onSubmit={handleJumpToPage} className="flex items-center space-x-2">
+            <form
+              onSubmit={handleJumpToPage}
+              className="flex items-center space-x-2"
+            >
               <input
                 type="number"
                 value={jumpToPage}
@@ -236,7 +265,7 @@ export default function PDFViewer({
                 min={1}
                 max={numPages || 1}
               />
-              <span>/ {numPages || '?'}</span>
+              <span>/ {numPages || "?"}</span>
             </form>
             <button
               onClick={() => changePage(1)}
@@ -257,7 +286,9 @@ export default function PDFViewer({
               >
                 -
               </button>
-              <span className="min-w-[60px] text-center">{Math.round(scale * 100)}%</span>
+              <span className="min-w-[60px] text-center">
+                {Math.round(scale * 100)}%
+              </span>
               <button
                 onClick={() => changeScale(0.1)}
                 className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
@@ -270,9 +301,9 @@ export default function PDFViewer({
             <button
               onClick={toggleFit}
               className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
-              title={fitMode === 'width' ? 'Fit to page' : 'Fit to width'}
+              title={fitMode === "width" ? "Fit to page" : "Fit to width"}
             >
-              {fitMode === 'width' ? 'Fit Page' : 'Fit Width'}
+              {fitMode === "width" ? "Fit Page" : "Fit Width"}
             </button>
 
             <div className="h-6 w-px bg-gray-300" />
@@ -300,8 +331,8 @@ export default function PDFViewer({
               onClick={() => setIsSideBySide((s) => !s)}
               className={`p-2 rounded-md ${
                 isSideBySide
-                  ? 'bg-blue-100 hover:bg-blue-200'
-                  : 'hover:bg-gray-200'
+                  ? "bg-blue-100 hover:bg-blue-200"
+                  : "hover:bg-gray-200"
               }`}
               title="Toggle side-by-side view"
             >
@@ -323,50 +354,98 @@ export default function PDFViewer({
 
           {/* Right */}
           <div className="flex items-center space-x-4">
-            <button
-              onClick={handleDownload}
-              className="p-2 hover:bg-gray-200 rounded-md"
-              title="Download PDF"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            {canShare && onShare && (
+              <button
+                onClick={onShare}
+                className="p-2 hover:bg-gray-200 rounded-md"
+                title="Share PDF"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                  />
+                </svg>
+              </button>
+            )}
 
-            <button
-              onClick={openInNewTab}
-              className="p-2 hover:bg-gray-200 rounded-md"
-              title="Open in new tab"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            {canDownload && (
+              <button
+                onClick={handleDownload}
+                className="p-2 hover:bg-gray-200 rounded-md"
+                title="Download PDF"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {canOpenInNewTab && (
+              <button
+                onClick={openInNewTab}
+                className="p-2 hover:bg-gray-200 rounded-md"
+                title="Open in new tab"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {!isAuthenticated && onLogin && (
+              <button
+                onClick={onLogin}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-2"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                  />
+                </svg>
+                <span>Log in</span>
+              </button>
+            )}
 
             <button
               onClick={toggleFullscreen}
               className="p-2 hover:bg-gray-200 rounded-md"
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               <svg
                 className="w-5 h-5"
@@ -403,7 +482,12 @@ export default function PDFViewer({
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -411,9 +495,11 @@ export default function PDFViewer({
 
         {/* Viewer */}
         <div className="flex-1 overflow-auto">
-          <div className={`flex justify-center ${isSideBySide ? 'space-x-4' : ''}`}>
+          <div
+            className={`flex justify-center ${isSideBySide ? "space-x-4" : ""}`}
+          >
             <Document
-              file={proxiedUrl}
+              file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
@@ -423,7 +509,9 @@ export default function PDFViewer({
               }
               error={
                 <div className="text-center py-8">
-                  <div className="text-red-500 mb-2">{error || 'Failed to load PDF.'}</div>
+                  <div className="text-red-500 mb-2">
+                    {error || "Failed to load PDF."}
+                  </div>
                   <button
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
@@ -434,7 +522,7 @@ export default function PDFViewer({
               }
               options={options}
             >
-              <div className={`flex ${isSideBySide ? 'space-x-4' : ''}`}>
+              <div className={`flex ${isSideBySide ? "space-x-4" : ""}`}>
                 <Page
                   key={`page_${pageNumber}_rot_${rotation}`}
                   pageNumber={pageNumber}

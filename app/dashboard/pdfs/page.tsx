@@ -33,6 +33,7 @@ import {
 } from 'firebase/firestore';
 import Image from 'next/image';
 import PDFViewer from '@/app/components/PDFViewer';
+import ShareDialog from '@/app/components/ShareDialog';
 
 interface PdfFile {
   id: string;
@@ -47,6 +48,7 @@ interface PdfFile {
   thumbnailUrl?: string;
   thumbnailPath?: string;
   storagePath?: string;
+  isPubliclyShared?: boolean;
 }
 
 // Cache for storing thumbnails - move outside component to persist between renders
@@ -65,6 +67,7 @@ export default function PDFsPage() {
   const [editingPdf, setEditingPdf] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [selectedPdf, setSelectedPdf] = useState<PdfFile | null>(null);
+  const [sharingPdf, setSharingPdf] = useState<PdfFile | null>(null);
 
   // Function to process a PDF and generate its thumbnail
   const processPdf = async (doc: any): Promise<PdfFile> => {
@@ -551,12 +554,79 @@ export default function PDFsPage() {
     }
   };
 
+  // Add sharing functions
+  const handleShareViaEmail = async (email: string) => {
+    if (!sharingPdf || !user) return;
+
+    try {
+      // Update the PDF document with the new access user
+      const pdfRef = doc(db, 'pdfs', sharingPdf.id);
+      
+      // Check if the email is already in the access list
+      if (sharingPdf.accessUsers.includes(email)) {
+        throw new Error('This user already has access to the PDF');
+      }
+
+      await updateDoc(pdfRef, {
+        accessUsers: [...sharingPdf.accessUsers, email]
+      });
+
+      // Update local state
+      setPdfs(current => {
+        const newMap = new Map(current);
+        const updatedPdf = { ...sharingPdf, accessUsers: [...sharingPdf.accessUsers, email] };
+        newMap.set(sharingPdf.id, updatedPdf);
+        return newMap;
+      });
+    } catch (error: any) {
+      throw new Error('Failed to share PDF: ' + error.message);
+    }
+  };
+
+  const handleShareViaLink = async () => {
+    if (!sharingPdf || !user) return '';
+
+    try {
+      // Update the PDF document to make it publicly shared
+      const pdfRef = doc(db, 'pdfs', sharingPdf.id);
+      await updateDoc(pdfRef, {
+        isPubliclyShared: true
+      });
+
+      // Update local state
+      setPdfs(current => {
+        const newMap = new Map(current);
+        const updatedPdf = { ...sharingPdf, isPubliclyShared: true };
+        newMap.set(sharingPdf.id, updatedPdf);
+        return newMap;
+      });
+
+      // Return the shareable link
+      return `${window.location.origin}/shared/${sharingPdf.id}`;
+    } catch (error: any) {
+      throw new Error('Failed to generate share link: ' + error.message);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {selectedPdf && (
         <PDFViewer
           fileUrl={selectedPdf.url}
           onClose={() => setSelectedPdf(null)}
+          fileName={selectedPdf.name}
+          canShare={selectedPdf.uploadedBy === user?.email}
+          onShare={() => setSharingPdf(selectedPdf)}
+        />
+      )}
+
+      {sharingPdf && (
+        <ShareDialog
+          isOpen={!!sharingPdf}
+          onClose={() => setSharingPdf(null)}
+          onShareViaEmail={handleShareViaEmail}
+          onShareViaLink={handleShareViaLink}
+          pdfName={sharingPdf.name}
         />
       )}
       
@@ -762,7 +832,35 @@ export default function PDFsPage() {
                               {({ active }) => (
                                 <button
                                   onClick={(e) => {
-                                    e.stopPropagation(); // Prevent event bubbling
+                                    e.stopPropagation();
+                                    setSharingPdf(pdf);
+                                  }}
+                                  className={`${
+                                    active ? 'bg-gray-100' : ''
+                                  } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                                >
+                                  <svg
+                                    className="mr-3 h-5 w-5 text-gray-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                                    />
+                                  </svg>
+                                  Share
+                                </button>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     handleDownload(pdf);
                                   }}
                                   className={`${
