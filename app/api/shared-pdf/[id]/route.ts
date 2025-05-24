@@ -45,6 +45,11 @@ export async function GET(
       uploadedBy: pdfData.uploadedBy,
       uploadedAt: pdfData.uploadedAt,
       isPubliclyShared: pdfData.isPubliclyShared,
+      size: pdfData.size || 0,
+      thumbnailUrl: pdfData.thumbnailUrl || null,
+      accessUsers: pdfData.accessUsers || [],
+      ownerId: pdfData.ownerId,
+      storagePath: pdfData.storagePath,
     });
   } catch (error) {
     console.error("Error fetching shared PDF:", error);

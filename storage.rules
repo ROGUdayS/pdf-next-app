@@ -18,8 +18,17 @@ service firebase.storage {
 
     // PDF files rules
     match /pdfs/{userId}/{allPaths=**} {
-      // Allow read if user is authenticated and has access
-      allow read: if request.auth != null;
+      // Allow read if user is authenticated and either:
+      // 1. It's their directory
+      // 2. They have access to the PDF (checked through Firestore)
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        exists(/databases/$(database)/documents/pdfs/$(resource.metadata.pdfId)) &&
+        (
+          get(/databases/$(database)/documents/pdfs/$(resource.metadata.pdfId)).data.accessUsers.hasAny([request.auth.token.email]) ||
+          get(/databases/$(database)/documents/pdfs/$(resource.metadata.pdfId)).data.isPubliclyShared == true
+        )
+      );
       
       // Allow write (create, update, delete) if user is authenticated and it's their directory
       allow write, delete: if request.auth != null && request.auth.uid == userId;

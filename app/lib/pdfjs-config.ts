@@ -1,8 +1,6 @@
-import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
+import { GlobalWorkerOptions } from "pdfjs-dist/build/pdf";
 
-if (typeof window !== 'undefined') {
-  // Dynamically import the worker
-  import('pdfjs-dist/build/pdf.worker.entry').then((worker) => {
-    GlobalWorkerOptions.workerSrc = worker.default;
-  });
-} 
+if (typeof window !== "undefined") {
+  // Set the worker source path
+  GlobalWorkerOptions.workerSrc = "/pdf-worker/pdf.worker.min.js";
+}

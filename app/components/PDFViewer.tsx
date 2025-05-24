@@ -17,6 +17,8 @@ interface PDFViewerProps {
   canOpenInNewTab?: boolean;
   isAuthenticated?: boolean;
   onLogin?: () => void;
+  onSaveToCollection?: () => Promise<void>;
+  isSaved?: boolean;
 }
 
 export default function PDFViewer({
@@ -29,6 +31,8 @@ export default function PDFViewer({
   canOpenInNewTab = true,
   isAuthenticated = true,
   onLogin,
+  onSaveToCollection,
+  isSaved = false,
 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -354,6 +358,48 @@ export default function PDFViewer({
 
           {/* Right */}
           <div className="flex items-center space-x-4">
+            {isAuthenticated && onSaveToCollection && !isSaved && (
+              <button
+                onClick={onSaveToCollection}
+                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center space-x-2"
+                title="Save to My PDFs"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <span>Save to My PDFs</span>
+              </button>
+            )}
+
+            {isAuthenticated && isSaved && (
+              <div className="px-4 py-2 bg-gray-100 text-gray-600 rounded-md flex items-center space-x-2">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>Saved to My PDFs</span>
+              </div>
+            )}
+
             {canShare && onShare && (
               <button
                 onClick={onShare}
