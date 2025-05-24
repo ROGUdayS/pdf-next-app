@@ -1,29 +1,15 @@
 {
   "indexes": [
     {
-      "collectionGroup": "pdfs",
+      "collectionGroup": "pdf_comments",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "accessUsers",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "fieldPath": "uploadedAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "pdfs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "ownerId",
+          "fieldPath": "pdfId",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "uploadedAt",
+          "fieldPath": "timestamp",
           "order": "DESCENDING"
         }
       ]

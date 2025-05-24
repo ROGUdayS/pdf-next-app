@@ -15,5 +15,34 @@ service cloud.firestore {
       // Allow delete if user is authenticated
       allow delete: if request.auth != null;
     }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is in the share list of a PDF
+    function isInShareList(pdfId) {
+      let pdf = get(/databases/$(database)/documents/pdfs/$(pdfId));
+      return pdf != null && (
+        pdf.data.ownerId == request.auth.uid || // Owner
+        pdf.data.isPubliclyShared == true || // Publicly shared
+        (pdf.data.accessUsers != null && pdf.data.accessUsers.hasAny([request.auth.email])) // Shared with user
+      );
+    }
+
+    // PDF Comments collection
+    match /pdf_comments/{commentId} {
+      // Allow read if user is authenticated and in the share list
+      allow read: if isAuthenticated() && isInShareList(resource.data.pdfId);
+      
+      // Allow create if user is authenticated and in the share list
+      allow create: if isAuthenticated() && isInShareList(request.resource.data.pdfId) && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Allow delete if user is the PDF owner
+      allow delete: if isAuthenticated() && 
+        get(/databases/$(database)/documents/pdfs/$(resource.data.pdfId)).data.ownerId == request.auth.uid;
+    }
   }
 } 

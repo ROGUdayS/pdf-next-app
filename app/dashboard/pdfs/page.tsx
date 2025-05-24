@@ -781,6 +781,14 @@ export default function PDFsPage() {
           fileName={selectedPdf.name}
           canShare={selectedPdf.uploadedBy === user?.email}
           onShare={() => setSharingPdf(selectedPdf)}
+          pdfId={selectedPdf.id}
+          isOwner={selectedPdf.ownerId === user?.uid}
+          onSaveToCollection={
+            selectedPdf.allowSave && selectedPdf.ownerId !== user?.uid
+              ? handleSaveToCollection
+              : undefined
+          }
+          isSaved={false}
         />
       )}
 

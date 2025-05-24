@@ -6,6 +6,7 @@ import { getAuth } from "firebase/auth";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "../lib/pdfjs-config";
+import PDFComments from "./PDFComments";
 
 interface PDFViewerProps {
   fileUrl: string;
@@ -19,6 +20,8 @@ interface PDFViewerProps {
   onLogin?: () => void;
   onSaveToCollection?: () => Promise<void>;
   isSaved?: boolean;
+  pdfId: string;
+  isOwner?: boolean;
 }
 
 export default function PDFViewer({
@@ -33,6 +36,8 @@ export default function PDFViewer({
   onLogin,
   onSaveToCollection,
   isSaved = false,
+  pdfId,
+  isOwner = false,
 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -52,6 +57,7 @@ export default function PDFViewer({
   });
   const [fitMode, setFitMode] = useState<"width" | "page">("width");
   const [isSaving, setIsSaving] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -559,58 +565,100 @@ export default function PDFViewer({
                 />
               </svg>
             </button>
+
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowComments(!showComments)}
+                className={`p-2 rounded-md ${
+                  showComments
+                    ? "bg-blue-100 hover:bg-blue-200"
+                    : "hover:bg-gray-200"
+                }`}
+                title="Toggle Comments"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Viewer */}
-        <div className="flex-1 overflow-auto">
-          <div
-            className={`flex justify-center ${isSideBySide ? "space-x-4" : ""}`}
-          >
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading={
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-                </div>
-              }
-              error={
-                <div className="text-center py-8">
-                  <div className="text-red-500 mb-2">
-                    {error || "Failed to load PDF."}
-                  </div>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              }
-              options={options}
+        {/* Main Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* PDF Viewer */}
+          <div className={`flex-1 overflow-auto ${showComments ? "mr-4" : ""}`}>
+            <div
+              className={`flex justify-center ${
+                isSideBySide ? "space-x-4" : ""
+              }`}
             >
-              <div className={`flex ${isSideBySide ? "space-x-4" : ""}`}>
-                <Page
-                  key={`page_${pageNumber}_rot_${rotation}`}
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  rotate={rotation}
-                  onLoadSuccess={handlePageLoadSuccess}
-                />
-                {isSideBySide && pageNumber < (numPages || 0) && (
+              <Document
+                file={pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading={
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+                  </div>
+                }
+                error={
+                  <div className="text-center py-8">
+                    <div className="text-red-500 mb-2">
+                      {error || "Failed to load PDF."}
+                    </div>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                }
+                options={options}
+              >
+                <div className={`flex ${isSideBySide ? "space-x-4" : ""}`}>
                   <Page
-                    key={`page_${pageNumber + 1}_rot_${rotation}`}
-                    pageNumber={pageNumber + 1}
+                    key={`page_${pageNumber}_rot_${rotation}`}
+                    pageNumber={pageNumber}
                     scale={scale}
                     rotate={rotation}
                     onLoadSuccess={handlePageLoadSuccess}
                   />
-                )}
-              </div>
-            </Document>
+                  {isSideBySide && pageNumber < (numPages || 0) && (
+                    <Page
+                      key={`page_${pageNumber + 1}_rot_${rotation}`}
+                      pageNumber={pageNumber + 1}
+                      scale={scale}
+                      rotate={rotation}
+                      onLoadSuccess={handlePageLoadSuccess}
+                    />
+                  )}
+                </div>
+              </Document>
+            </div>
           </div>
+
+          {/* Comments Sidebar */}
+          {showComments && (
+            <div className="w-80 flex-shrink-0 bg-white rounded-lg overflow-hidden">
+              <PDFComments
+                pdfId={pdfId}
+                isOwner={isOwner}
+                isAuthorized={isAuthenticated}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
