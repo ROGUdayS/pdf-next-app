@@ -12,6 +12,31 @@
 
 # testing
 /coverage
+# Jest and testing dependencies
+jest.config.js
+jest.setup.js
+# Test files (but allow .md test documentation)
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.tsx
+**/*.spec.js
+**/*.spec.jsx
+# Test coverage reports
+coverage/
+.nyc_output/
+# Test results
+test-results/
+junit.xml
+# Testing library cache
+.eslintcache
+
+# Mocks
+__mocks__/
+
 
 # next.js
 /.next/

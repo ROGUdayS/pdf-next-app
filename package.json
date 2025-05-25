@@ -7,7 +7,11 @@
     "build": "node copy-pdf-worker.js && SKIP_ENV_VALIDATION=1 next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node copy-pdf-worker.js"
+    "postinstall": "node copy-pdf-worker.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.9.1",
@@ -52,6 +56,11 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/pdfjs-dist": "^2.10.377",
     "@types/react": "^18.2.0",
@@ -59,10 +68,13 @@
     "autoprefixer": "^10.4.14",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.24",
     "prisma": "^6.8.2",
     "tailwindcss": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "ts-jest": "^29.3.4",
     "typescript": "^5"
   }
 }
