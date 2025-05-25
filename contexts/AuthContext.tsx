@@ -152,8 +152,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribeShared = onSnapshot(
         sharedQuery,
         (snapshot) => {
-          console.log("Shared PDFs query result:", { size: snapshot.size });
-          setPdfStats((prev) => ({ ...prev, sharedCount: snapshot.size }));
+          // Filter out PDFs owned by the user to get only truly shared PDFs
+          const sharedPdfsCount = snapshot.docs.filter(
+            (doc) => doc.data().ownerId !== user.uid
+          ).length;
+          console.log("Shared PDFs query result:", {
+            total: snapshot.size,
+            sharedByOthers: sharedPdfsCount,
+          });
+          setPdfStats((prev) => ({ ...prev, sharedCount: sharedPdfsCount }));
         },
         (error: FirebaseError) => {
           console.error("Error in shared PDFs query:", error);

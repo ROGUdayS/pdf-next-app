@@ -219,7 +219,7 @@ export default function SharedPDFsPage() {
       {pdfs.map((pdf) => (
         <div
           key={pdf.id}
-          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
+          className="bg-white rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200"
         >
           <div className="cursor-pointer" onClick={() => setSelectedPdf(pdf)}>
             {pdf.thumbnailUrl ? (
@@ -352,7 +352,7 @@ export default function SharedPDFsPage() {
 
   // List view component
   const ListView = ({ pdfs }: { pdfs: SharedPDF[] }) => (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+    <div className="bg-white shadow-sm rounded-lg overflow-visible">
       <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
         <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 uppercase tracking-wider">
           <div className="col-span-1"></div>
