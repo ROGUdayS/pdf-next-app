@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/Button';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { Button } from "@/components/ui/Button";
+import Image from "next/image";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
   const { user, signInWithGoogle } = useAuth();
@@ -13,16 +13,16 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   }, [user, router]);
 
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (error: any) {
-      console.error('Failed to sign in with Google:', error.message);
+      console.error("Failed to sign in with Google:", error.message);
     }
   };
 
@@ -33,7 +33,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className="text-xl font-bold text-gray-900">PDF Culture</span>
+              <span className="text-xl font-bold text-gray-900">
+                PDF Culture
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" asChild>
@@ -58,8 +60,8 @@ export default function Home() {
               </span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-2xl mx-auto">
-              Join our vibrant community of knowledge seekers. Share PDFs, discover new content, 
-              and connect with like-minded individuals.
+              Join our vibrant community of knowledge seekers. Share PDFs,
+              discover new content, and connect with like-minded individuals.
             </p>
 
             {/* Auth Buttons */}
@@ -67,7 +69,7 @@ export default function Home() {
               <Button size="lg" className="w-full max-w-sm" asChild>
                 <Link href="/signup">Get Started</Link>
               </Button>
-              
+
               <div className="relative w-full max-w-sm">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-300" />
@@ -80,9 +82,9 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
+                <Button
+                  variant="outline"
+                  size="lg"
                   className="w-full"
                   onClick={handleGoogleSignIn}
                 >
@@ -97,7 +99,11 @@ export default function Home() {
                 </Button>
                 <Button variant="outline" size="lg" className="w-full" asChild>
                   <Link href="/signin">
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                       <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                     </svg>
@@ -119,7 +125,9 @@ export default function Home() {
                   <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100">
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">{feature.title}</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {feature.title}
+                  </h3>
                 </div>
                 <p className="mt-4 text-gray-500">{feature.description}</p>
               </div>
@@ -132,7 +140,7 @@ export default function Home() {
       <footer className="mt-24 bg-white border-t border-gray-200">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-500 text-sm">
-            © 2024 PDF Culture. All rights reserved.
+            © 2025 PDF Culture. All rights reserved.
           </div>
         </div>
       </footer>
@@ -142,29 +150,62 @@ export default function Home() {
 
 const features = [
   {
-    title: 'Easy Sharing',
-    description: 'Share PDFs securely with your community in just a few clicks. Control who can access your content.',
+    title: "Easy Sharing",
+    description:
+      "Share PDFs securely with your community in just a few clicks. Control who can access your content.",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+        />
       </svg>
     ),
   },
   {
-    title: 'Smart Organization',
-    description: 'Organize your PDFs with tags, folders, and smart collections. Find what you need instantly.',
+    title: "Smart Organization",
+    description:
+      "Organize your PDFs with tags, folders, and smart collections. Find what you need instantly.",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
       </svg>
     ),
   },
   {
-    title: 'Community Engagement',
-    description: 'Connect with others, discuss content, and build meaningful relationships through shared knowledge.',
+    title: "Community Engagement",
+    description:
+      "Connect with others, discuss content, and build meaningful relationships through shared knowledge.",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"
+        />
       </svg>
     ),
   },
