@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { storage, db } from "@/lib/firebase";
 import { Menu } from "@headlessui/react";
 import { generatePdfThumbnail } from "@/app/utils/pdfjs";
+import { getBaseUrl } from "@/lib/utils";
 import {
   ref,
   uploadBytes,
@@ -674,7 +675,7 @@ export default function PDFsPage() {
       }
 
       // Always send email notification
-      const shareUrl = `${window.location.origin}/shared/${sharingPdf.id}`;
+      const shareUrl = `${getBaseUrl()}/shared/${sharingPdf.id}`;
       const response = await fetch("/api/share-notification", {
         method: "POST",
         headers: {
@@ -709,7 +710,7 @@ export default function PDFsPage() {
           return newMap;
         });
       }
-    } catch (error: Error | unknown) {
+    } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to share PDF";
       throw new Error("Failed to share PDF: " + errorMessage);
@@ -740,7 +741,7 @@ export default function PDFsPage() {
       });
 
       // Return the shareable link
-      return `${window.location.origin}/shared/${sharingPdf.id}`;
+      return `${getBaseUrl()}/shared/${sharingPdf.id}`;
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
