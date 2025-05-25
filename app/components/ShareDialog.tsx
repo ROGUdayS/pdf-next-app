@@ -93,10 +93,10 @@ export default function ShareDialog({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title
                   as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900"
+                  className="text-lg font-medium leading-6 text-gray-900 dark:text-white"
                 >
                   Share &ldquo;{pdfName}&rdquo;
                 </Dialog.Title>
@@ -104,15 +104,17 @@ export default function ShareDialog({
                 {/* Permissions Section */}
                 <div className="mt-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
                       Allow recipients to save PDF
                     </span>
                     <Switch
                       checked={allowSave}
                       onChange={setAllowSave}
                       className={`${
-                        allowSave ? "bg-blue-600" : "bg-gray-200"
-                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                        allowSave
+                          ? "bg-blue-600"
+                          : "bg-gray-200 dark:bg-gray-600"
+                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800`}
                     >
                       <span
                         className={`${
@@ -121,7 +123,7 @@ export default function ShareDialog({
                       />
                     </Switch>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {allowSave
                       ? "Recipients can save, download, and open the PDF in a new tab"
                       : "Recipients can only view the PDF"}
@@ -130,19 +132,19 @@ export default function ShareDialog({
 
                 {/* Error/Success Messages */}
                 {error && (
-                  <div className="mt-2 p-2 bg-red-50 text-red-500 rounded-md text-sm">
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-md text-sm border border-red-200 dark:border-red-800">
                     {error}
                   </div>
                 )}
                 {success && (
-                  <div className="mt-2 p-2 bg-green-50 text-green-500 rounded-md text-sm">
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/30 text-green-500 dark:text-green-400 rounded-md text-sm border border-green-200 dark:border-green-800">
                     {success}
                   </div>
                 )}
 
                 {/* Share via Email */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                     Share via Email
                   </h4>
                   <form onSubmit={handleEmailShare} className="mt-2">
@@ -156,14 +158,14 @@ export default function ShareDialog({
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="Enter email address"
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         disabled={isLoading}
                         aria-label="Email address to share PDF with"
                       />
                       <button
                         type="submit"
                         disabled={isLoading || !email}
-                        className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        className="rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
                         aria-label="Share PDF via email"
                       >
                         Share
@@ -174,7 +176,7 @@ export default function ShareDialog({
 
                 {/* Share via Link */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                     Share via Link
                   </h4>
                   <div className="mt-2">
@@ -188,12 +190,12 @@ export default function ShareDialog({
                           type="text"
                           value={shareLink}
                           readOnly
-                          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm bg-gray-50"
+                          className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
                           aria-label="Generated share link"
                         />
                         <button
                           onClick={copyToClipboard}
-                          className="rounded-md bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                          className="rounded-md bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                           aria-label="Copy share link to clipboard"
                         >
                           Copy
@@ -203,7 +205,7 @@ export default function ShareDialog({
                       <button
                         onClick={handleLinkShare}
                         disabled={isLoading}
-                        className="w-full rounded-md bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                        className="w-full rounded-md bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 disabled:opacity-50"
                         aria-label="Generate shareable link for PDF"
                       >
                         Generate Link
@@ -215,7 +217,7 @@ export default function ShareDialog({
                 <div className="mt-6">
                   <button
                     onClick={onClose}
-                    className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   >
                     Close
                   </button>
