@@ -320,8 +320,8 @@ export default function PDFViewer({
   if (!pdfUrl) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="bg-card rounded-lg p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
         </div>
       </div>
     );
@@ -335,19 +335,19 @@ export default function PDFViewer({
       <div
         id="pdf-viewer-container"
         ref={containerRef}
-        className={`bg-gray-200 rounded-lg p-4 max-w-6xl w-full flex flex-col ${
+        className={`bg-background rounded-lg p-4 max-w-6xl w-full flex flex-col ${
           isFullscreen ? "h-screen" : "max-h-[90vh]"
         }`}
         tabIndex={0}
       >
         {/* Toolbar */}
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-4 p-2 bg-gray-100 rounded-lg">
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-4 p-2 bg-card rounded-lg border border-border">
           {/* Left */}
           <div className="flex items-center space-x-4">
             <button
               onClick={() => changePage(-1)}
               disabled={pageNumber <= 1}
-              className="px-3 py-1 bg-gray-200 rounded-md disabled:opacity-50 hover:bg-gray-300"
+              className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
               title="Previous page (← or ↑)"
             >
               Previous
@@ -360,17 +360,17 @@ export default function PDFViewer({
                 type="number"
                 value={jumpToPage}
                 onChange={(e) => setJumpToPage(e.target.value)}
-                className="w-16 px-2 py-1 border rounded-md"
+                className="w-16 px-2 py-1 border border-border rounded-md bg-background text-foreground"
                 placeholder={`${pageNumber}`}
                 min={1}
                 max={numPages || 1}
               />
-              <span>/ {numPages || "?"}</span>
+              <span className="text-foreground">/ {numPages || "?"}</span>
             </form>
             <button
               onClick={() => changePage(1)}
               disabled={pageNumber >= (numPages || 1)}
-              className="px-3 py-1 bg-gray-200 rounded-md disabled:opacity-50 hover:bg-gray-300"
+              className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
               title="Next page (→ or ↓)"
             >
               Next
@@ -382,17 +382,17 @@ export default function PDFViewer({
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => changeScale(-0.1)}
-                className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
+                className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                 title="Zoom out (-)"
               >
                 -
               </button>
-              <span className="min-w-[60px] text-center">
+              <span className="min-w-[60px] text-center text-foreground">
                 {Math.round(scale * 100)}%
               </span>
               <button
                 onClick={() => changeScale(0.1)}
-                className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
+                className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                 title="Zoom in (+)"
               >
                 +
@@ -401,17 +401,17 @@ export default function PDFViewer({
 
             <button
               onClick={toggleFit}
-              className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
+              className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
               title={fitMode === "width" ? "Fit to page" : "Fit to width"}
             >
               {fitMode === "width" ? "Fit Page" : "Fit Width"}
             </button>
 
-            <div className="h-6 w-px bg-gray-300" />
+            <div className="h-6 w-px bg-border" />
 
             <button
               onClick={() => rotatePages(90)}
-              className="p-2 hover:bg-gray-200 rounded-md"
+              className="p-2 hover:bg-secondary rounded-md text-foreground"
               title="Rotate"
             >
               <svg
@@ -432,8 +432,8 @@ export default function PDFViewer({
               onClick={() => setIsSideBySide((s) => !s)}
               className={`p-2 rounded-md ${
                 isSideBySide
-                  ? "bg-blue-100 hover:bg-blue-200"
-                  : "hover:bg-gray-200"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "hover:bg-secondary text-foreground"
               }`}
               title="Toggle side-by-side view"
             >
@@ -486,7 +486,7 @@ export default function PDFViewer({
             )}
 
             {isAuthenticated && isSaved && (
-              <div className="px-4 py-2 bg-gray-100 text-gray-600 rounded-md flex items-center space-x-2">
+              <div className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md flex items-center space-x-2">
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -507,7 +507,7 @@ export default function PDFViewer({
             {canShare && onShare && (
               <button
                 onClick={onShare}
-                className="p-2 hover:bg-gray-200 rounded-md"
+                className="p-2 hover:bg-secondary rounded-md text-foreground"
                 title="Share PDF"
               >
                 <svg
@@ -529,7 +529,7 @@ export default function PDFViewer({
             {canDownload && (
               <button
                 onClick={handleDownload}
-                className="p-2 hover:bg-gray-200 rounded-md"
+                className="p-2 hover:bg-secondary rounded-md text-foreground"
                 title="Download PDF"
               >
                 <svg
@@ -551,7 +551,7 @@ export default function PDFViewer({
             {canOpenInNewTab && (
               <button
                 onClick={openInNewTab}
-                className="p-2 hover:bg-gray-200 rounded-md"
+                className="p-2 hover:bg-secondary rounded-md text-foreground"
                 title="Open in new tab"
               >
                 <svg
@@ -594,7 +594,7 @@ export default function PDFViewer({
 
             <button
               onClick={toggleFullscreen}
-              className="p-2 hover:bg-gray-200 rounded-md"
+              className="p-2 hover:bg-secondary rounded-md text-foreground"
               title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               <svg
@@ -623,7 +623,7 @@ export default function PDFViewer({
 
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-200 rounded-md"
+              className="p-2 hover:bg-secondary rounded-md text-foreground"
               title="Close"
             >
               <svg
@@ -646,8 +646,8 @@ export default function PDFViewer({
                 onClick={() => setShowComments(!showComments)}
                 className={`p-2 rounded-md ${
                   showComments
-                    ? "bg-blue-100 hover:bg-blue-200"
-                    : "hover:bg-gray-200"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-secondary text-foreground"
                 }`}
                 title="Toggle Comments"
               >
@@ -671,7 +671,7 @@ export default function PDFViewer({
 
         {/* Keyboard shortcuts help text with fade out animation */}
         {showKeyboardHelp && (
-          <div className="text-xs text-gray-600 mb-2 text-center transition-opacity duration-500 ease-in-out">
+          <div className="text-xs text-muted-foreground mb-2 text-center transition-opacity duration-500 ease-in-out">
             Use arrow keys to navigate pages • + / - to zoom • 0 to reset zoom •
             Esc to close
           </div>
@@ -692,17 +692,17 @@ export default function PDFViewer({
                 onLoadError={onDocumentLoadError}
                 loading={
                   <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
                   </div>
                 }
                 error={
                   <div className="text-center py-8">
-                    <div className="text-red-500 mb-2">
+                    <div className="text-destructive mb-2">
                       {error || "Failed to load PDF."}
                     </div>
                     <button
                       onClick={() => window.location.reload()}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                     >
                       Try Again
                     </button>
@@ -734,7 +734,7 @@ export default function PDFViewer({
 
           {/* Comments Sidebar */}
           {showComments && (
-            <div className="w-80 flex-shrink-0 bg-white rounded-lg overflow-hidden">
+            <div className="w-80 flex-shrink-0 bg-card rounded-lg overflow-hidden border border-border">
               <PDFComments
                 pdfId={pdfId}
                 isOwner={isOwner}

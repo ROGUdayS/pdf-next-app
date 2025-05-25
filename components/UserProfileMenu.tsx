@@ -54,8 +54,8 @@ const AvatarWithUpload = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={(e) => {
-        e.stopPropagation();
         if (!isGoogleUser && showUploadHover) {
+          e.stopPropagation();
           onUploadClick();
         }
       }}
@@ -255,11 +255,11 @@ export default function UserProfileMenu() {
           user={user}
           hasValidPhoto={hasValidPhoto}
           isUploading={isUploading}
-          onUploadClick={() => fileInputRef.current?.click()}
+          onUploadClick={() => {}}
           size="small"
-          showUploadHover={true}
+          showUploadHover={false}
         />
-        <div className="flex flex-col items-start">
+        <div className="hidden sm:flex flex-col items-start">
           <span className="text-sm font-medium text-foreground">
             {displayName}
           </span>
@@ -269,7 +269,7 @@ export default function UserProfileMenu() {
         </div>
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+          className={`hidden sm:block w-4 h-4 text-muted-foreground transition-transform duration-200 ${
             isMenuOpen ? "rotate-180" : ""
           }`}
           fill="none"

@@ -306,8 +306,8 @@ export default function PDFComments({
           className="rounded-full"
         />
       ) : (
-        <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-          <span className="text-sm font-medium text-gray-600">
+        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+          <span className="text-sm font-medium text-secondary-foreground">
             {name.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -317,21 +317,21 @@ export default function PDFComments({
 
   if (!isAuthorized) {
     return (
-      <div className="p-4 text-gray-600">
+      <div className="p-4 text-muted-foreground">
         You need to be authorized to view comments.
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg shadow-lg">
+    <div className="h-full flex flex-col bg-card rounded-lg shadow-lg border border-border">
       {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Comments</h2>
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-foreground">Comments</h2>
         {isOwner && (
           <button
             onClick={clearAllComments}
-            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+            className="p-2 text-destructive hover:text-destructive/80 hover:bg-destructive/10 rounded-full transition-colors"
             title="Clear all comments"
           >
             <svg
@@ -354,18 +354,20 @@ export default function PDFComments({
       {/* Comments List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {comments.map((c) => (
-          <div key={c.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+          <div key={c.id} className="bg-secondary/50 rounded-lg p-3 space-y-2">
             <div className="flex items-start space-x-3">
               <UserAvatar url={c.userAvatar} name={c.userName} />
               <div className="flex-1">
                 <div className="flex justify-between items-start">
-                  <span className="font-medium">{c.userName}</span>
-                  <span className="text-sm text-gray-500">
+                  <span className="font-medium text-foreground">
+                    {c.userName}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
                     {format(c.timestamp, "MMM d, yyyy h:mm a")}
                   </span>
                 </div>
                 <div
-                  className="mt-2 text-gray-700"
+                  className="mt-2 text-foreground"
                   dangerouslySetInnerHTML={{ __html: c.formattedText }}
                 />
                 <div className="mt-2 flex items-center space-x-4">
@@ -373,8 +375,8 @@ export default function PDFComments({
                     onClick={() => toggleLike(c.id)}
                     className={`text-sm flex items-center space-x-1 ${
                       c.likes.includes(auth.currentUser?.uid || "")
-                        ? "text-blue-500"
-                        : "text-gray-500 hover:text-blue-500"
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-primary"
                     }`}
                   >
                     <svg
@@ -398,7 +400,7 @@ export default function PDFComments({
                   </button>
                   <button
                     onClick={() => setReplyingTo(c.id)}
-                    className="text-sm text-gray-500 hover:text-blue-500"
+                    className="text-sm text-muted-foreground hover:text-primary"
                   >
                     Reply
                   </button>
@@ -412,18 +414,20 @@ export default function PDFComments({
                 {c.replies.map((reply) => (
                   <div
                     key={reply.id}
-                    className="flex items-start space-x-3 bg-white rounded-lg p-2"
+                    className="flex items-start space-x-3 bg-card rounded-lg p-2 border border-border"
                   >
                     <UserAvatar url={reply.userAvatar} name={reply.userName} />
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
-                        <span className="font-medium">{reply.userName}</span>
-                        <span className="text-sm text-gray-500">
+                        <span className="font-medium text-foreground">
+                          {reply.userName}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
                           {format(reply.timestamp, "MMM d, yyyy h:mm a")}
                         </span>
                       </div>
                       <div
-                        className="mt-1 text-gray-700"
+                        className="mt-1 text-foreground"
                         dangerouslySetInnerHTML={{ __html: reply.text }}
                       />
                     </div>
@@ -438,25 +442,25 @@ export default function PDFComments({
                 <div className="flex space-x-2 mb-2">
                   <button
                     onClick={() => toggleBold(true)}
-                    className={`p-2 rounded hover:bg-gray-100 ${
-                      isReplyBoldActive ? "bg-gray-200" : ""
-                    }`}
+                    className={`p-2 rounded hover:bg-secondary ${
+                      isReplyBoldActive ? "bg-secondary" : ""
+                    } text-foreground`}
                     title="Bold"
                   >
                     <strong>B</strong>
                   </button>
                   <button
                     onClick={() => toggleItalic(true)}
-                    className={`p-2 rounded hover:bg-gray-100 ${
-                      isReplyItalicActive ? "bg-gray-200" : ""
-                    }`}
+                    className={`p-2 rounded hover:bg-secondary ${
+                      isReplyItalicActive ? "bg-secondary" : ""
+                    } text-foreground`}
                     title="Italic"
                   >
                     <em>I</em>
                   </button>
                   <button
                     onClick={() => insertBulletPrefix(true)}
-                    className="p-2 rounded hover:bg-gray-100"
+                    className="p-2 rounded hover:bg-secondary text-foreground"
                     title="Insert Bullet Prefix"
                   >
                     •
@@ -467,16 +471,16 @@ export default function PDFComments({
                     ref={replyEditorRef}
                     contentEditable
                     onInput={(e) => handleInput(e, true)}
-                    className="flex-1 p-2 border rounded-lg outline-none min-h-[3rem]"
+                    className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[3rem] bg-background text-foreground"
                   />
                   <button
                     onClick={() => addReply(c.id)}
-                    className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full hover:bg-blue-600"
+                    className="flex items-center justify-center w-10 h-10 bg-primary rounded-full hover:bg-primary/90"
                     title="Send Reply"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-white"
+                      className="h-5 w-5 text-primary-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -497,29 +501,29 @@ export default function PDFComments({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-border">
         <div className="flex space-x-2 mb-2">
           <button
             onClick={() => toggleBold(false)}
-            className={`p-2 rounded hover:bg-gray-100 ${
-              isBoldActive ? "bg-gray-200" : ""
-            }`}
+            className={`p-2 rounded hover:bg-secondary ${
+              isBoldActive ? "bg-secondary" : ""
+            } text-foreground`}
             title="Bold"
           >
             <strong>B</strong>
           </button>
           <button
             onClick={() => toggleItalic(false)}
-            className={`p-2 rounded hover:bg-gray-100 ${
-              isItalicActive ? "bg-gray-200" : ""
-            }`}
+            className={`p-2 rounded hover:bg-secondary ${
+              isItalicActive ? "bg-secondary" : ""
+            } text-foreground`}
             title="Italic"
           >
             <em>I</em>
           </button>
           <button
             onClick={() => insertBulletPrefix(false)}
-            className="p-2 rounded hover:bg-gray-100"
+            className="p-2 rounded hover:bg-secondary text-foreground"
             title="Insert Bullet Prefix"
           >
             •
@@ -530,16 +534,16 @@ export default function PDFComments({
             ref={editorRef}
             contentEditable
             onInput={(e) => handleInput(e, false)}
-            className="flex-1 p-2 border rounded-lg outline-none min-h-[3rem]"
+            className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[3rem] bg-background text-foreground"
           />
           <button
             onClick={addComment}
-            className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full hover:bg-blue-600"
+            className="flex items-center justify-center w-10 h-10 bg-primary rounded-full hover:bg-primary/90"
             title="Send Comment"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 text-white"
+              className="h-5 w-5 text-primary-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
