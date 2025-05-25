@@ -5,12 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   const { user, signInWithGoogle } = useAuth();
   const router = useRouter();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -41,7 +42,9 @@ export default function Home() {
                 PDF Culture
               </span>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-4">
               <ThemeToggle />
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/signin">Sign In</Link>
@@ -50,28 +53,84 @@ export default function Home() {
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden flex items-center space-x-2">
+              <ThemeToggle />
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={
+                      isMobileMenuOpen
+                        ? "M6 18L18 6M6 6l12 12"
+                        : "M4 6h16M4 12h16M4 18h16"
+                    }
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          {/* Mobile Navigation Menu */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-md">
+              <div className="px-2 pt-2 pb-3 space-y-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  asChild
+                >
+                  <Link
+                    href="/signin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sign In
+                  </Link>
+                </Button>
+                <Button size="sm" className="w-full" asChild>
+                  <Link
+                    href="/signup"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sign Up
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <main className="pt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="pt-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center">
-            <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground">
               <span className="block">Share PDFs,</span>
               <span className="block mt-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                 Collaborate Seamlessly
               </span>
             </h1>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground max-w-2xl mx-auto">
+            <p className="mt-6 text-base sm:text-lg leading-7 sm:leading-8 text-muted-foreground max-w-2xl mx-auto px-4">
               Upload, share, and collaborate on PDF documents with advanced
               viewing, real-time commenting, and secure sharing controls.
               Perfect for teams, students, and professionals.
             </p>
 
             {/* Auth Buttons */}
-            <div className="mt-10 flex flex-col items-center gap-4">
+            <div className="mt-10 flex flex-col items-center gap-4 px-4">
               <Button size="lg" className="w-full max-w-sm" asChild>
                 <Link href="/signup">Get Started</Link>
               </Button>
@@ -87,7 +146,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
                 <Button
                   variant="outline"
                   size="lg"
@@ -121,21 +180,21 @@ export default function Home() {
           </div>
 
           {/* Features Grid */}
-          <div className="mt-24 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 sm:mt-20 lg:mt-24 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 px-4">
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="relative group rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
+                className="relative group rounded-2xl border border-border bg-card p-4 sm:p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
               >
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 flex-shrink-0">
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-card-foreground">
+                  <h3 className="text-base sm:text-lg font-semibold text-card-foreground">
                     {feature.title}
                   </h3>
                 </div>
-                <p className="mt-4 text-muted-foreground">
+                <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground">
                   {feature.description}
                 </p>
               </div>
@@ -145,8 +204,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-24 bg-card border-t border-border">
-        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      <footer className="mt-16 sm:mt-20 lg:mt-24 bg-card border-t border-border">
+        <div className="max-w-7xl mx-auto py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
           <div className="text-center text-muted-foreground text-sm">
             © 2025 PDF Culture. All rights reserved.
           </div>

@@ -50,10 +50,10 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-background py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+          <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             Sign in to your account
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -67,10 +67,10 @@ export default function SignIn() {
           </p>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-11 sm:h-12"
             onClick={handleGoogleSignIn}
             disabled={loading}
           >
@@ -96,9 +96,12 @@ export default function SignIn() {
           </div>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form
+          className="mt-6 sm:mt-8 space-y-4 sm:space-y-6"
+          onSubmit={handleSubmit}
+        >
           {error && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-4">
+            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 sm:p-4">
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
@@ -107,7 +110,7 @@ export default function SignIn() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-foreground"
+                className="block text-sm font-medium text-foreground mb-1"
               >
                 Email address
               </label>
@@ -120,6 +123,7 @@ export default function SignIn() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 sm:h-12"
                 />
               </div>
             </div>
@@ -127,7 +131,7 @@ export default function SignIn() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-foreground"
+                className="block text-sm font-medium text-foreground mb-1"
               >
                 Password
               </label>
@@ -140,6 +144,7 @@ export default function SignIn() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 sm:h-12 pr-10"
                 />
                 <button
                   type="button"
@@ -166,7 +171,11 @@ export default function SignIn() {
           </div>
 
           <div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-11 sm:h-12"
+              disabled={loading}
+            >
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </div>
