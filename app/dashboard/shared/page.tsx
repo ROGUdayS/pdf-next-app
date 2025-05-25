@@ -219,7 +219,7 @@ export default function SharedPDFsPage() {
       {pdfs.map((pdf) => (
         <div
           key={pdf.id}
-          className="bg-white rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200"
+          className="bg-card rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200 border border-border"
         >
           <div className="cursor-pointer" onClick={() => setSelectedPdf(pdf)}>
             {pdf.thumbnailUrl ? (
@@ -242,7 +242,7 @@ export default function SharedPDFsPage() {
             ) : (
               <div className="pdf-fallback">
                 <svg
-                  className="w-12 h-12 text-gray-400 mb-2"
+                  className="w-12 h-12 text-muted-foreground mb-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -254,7 +254,9 @@ export default function SharedPDFsPage() {
                     d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                   />
                 </svg>
-                <span className="text-sm text-gray-400">PDF Preview</span>
+                <span className="text-sm text-muted-foreground">
+                  PDF Preview
+                </span>
               </div>
             )}
           </div>
@@ -262,17 +264,17 @@ export default function SharedPDFsPage() {
           <div className="p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0 pr-4">
-                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                <h3 className="text-lg font-semibold text-card-foreground truncate">
                   {pdf.name}
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Shared by: {pdf.uploadedBy}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {pdf.uploadedAt.toLocaleDateString()}
                 </p>
                 {pdf.isSaved && (
-                  <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                  <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">
                     Saved to My PDFs
                   </span>
                 )}
@@ -280,9 +282,9 @@ export default function SharedPDFsPage() {
 
               <div className="relative flex-shrink-0">
                 <Menu as="div" className="relative inline-block text-left">
-                  <Menu.Button className="p-2 hover:bg-gray-100 rounded-full">
+                  <Menu.Button className="p-2 hover:bg-accent rounded-full">
                     <svg
-                      className="w-5 h-5 text-gray-500"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -296,7 +298,7 @@ export default function SharedPDFsPage() {
                     </svg>
                   </Menu.Button>
 
-                  <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
                       <Menu.Item>
                         {({ active }) => (
@@ -312,17 +314,17 @@ export default function SharedPDFsPage() {
                               }
                             }}
                             disabled={removingPdfId === pdf.id}
-                            className={`${active ? "bg-gray-100" : ""} ${
+                            className={`${active ? "bg-accent" : ""} ${
                               removingPdfId === pdf.id
                                 ? "opacity-50 cursor-not-allowed"
                                 : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-red-600`}
+                            } flex w-full items-center px-4 py-2 text-sm text-destructive`}
                           >
                             {removingPdfId === pdf.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-3"></div>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-destructive mr-3"></div>
                             ) : (
                               <svg
-                                className="mr-3 h-5 w-5 text-red-400"
+                                className="mr-3 h-5 w-5 text-destructive"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -352,9 +354,9 @@ export default function SharedPDFsPage() {
 
   // List view component
   const ListView = ({ pdfs }: { pdfs: SharedPDF[] }) => (
-    <div className="bg-white shadow-sm rounded-lg overflow-visible">
-      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 uppercase tracking-wider">
+    <div className="bg-card shadow-sm rounded-lg overflow-visible border border-border">
+      <div className="px-6 py-3 bg-muted border-b border-border">
+        <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground uppercase tracking-wider">
           <div className="col-span-1"></div>
           <div className="col-span-4">Name</div>
           <div className="col-span-2">Size</div>
@@ -363,11 +365,11 @@ export default function SharedPDFsPage() {
           <div className="col-span-1"></div>
         </div>
       </div>
-      <div className="divide-y divide-gray-200">
+      <div className="divide-y divide-border">
         {pdfs.map((pdf) => (
           <div
             key={pdf.id}
-            className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            className="px-6 py-4 hover:bg-accent cursor-pointer transition-colors"
             onClick={() => setSelectedPdf(pdf)}
           >
             <div className="grid grid-cols-12 gap-4 items-center">
@@ -381,9 +383,9 @@ export default function SharedPDFsPage() {
                     className="rounded object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-8 bg-gray-100 rounded flex items-center justify-center">
+                  <div className="w-10 h-8 bg-muted rounded flex items-center justify-center">
                     <svg
-                      className="w-5 h-5 text-gray-400"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -400,37 +402,39 @@ export default function SharedPDFsPage() {
               </div>
               <div className="col-span-4">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-card-foreground truncate">
                     {pdf.name}
                   </p>
                   {pdf.isSaved && (
-                    <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                    <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">
                       Saved
                     </span>
                   )}
                 </div>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatFileSize(pdf.size || 0)}
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">{pdf.uploadedBy}</p>
+                <p className="text-sm text-muted-foreground">
+                  {pdf.uploadedBy}
+                </p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatDate(pdf.uploadedAt)}
                 </p>
               </div>
               <div className="col-span-1">
                 <Menu as="div" className="relative inline-block text-left">
                   <Menu.Button
-                    className="p-2 hover:bg-gray-200 rounded-full"
+                    className="p-2 hover:bg-accent rounded-full"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <svg
-                      className="w-5 h-5 text-gray-500"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -444,7 +448,7 @@ export default function SharedPDFsPage() {
                     </svg>
                   </Menu.Button>
 
-                  <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
                       <Menu.Item>
                         {({ active }) => (
@@ -460,17 +464,17 @@ export default function SharedPDFsPage() {
                               }
                             }}
                             disabled={removingPdfId === pdf.id}
-                            className={`${active ? "bg-gray-100" : ""} ${
+                            className={`${active ? "bg-accent" : ""} ${
                               removingPdfId === pdf.id
                                 ? "opacity-50 cursor-not-allowed"
                                 : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-red-600`}
+                            } flex w-full items-center px-4 py-2 text-sm text-destructive`}
                           >
                             {removingPdfId === pdf.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-3"></div>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-destructive mr-3"></div>
                             ) : (
                               <svg
-                                className="mr-3 h-5 w-5 text-red-400"
+                                className="mr-3 h-5 w-5 text-destructive"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -555,7 +559,14 @@ export default function SharedPDFsPage() {
       {/* Header with search, view toggle */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Shared with Me</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">
+              Shared with Me
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              PDFs that have been shared with you by other users.
+            </p>
+          </div>
         </div>
 
         {/* Search and controls */}
@@ -564,7 +575,7 @@ export default function SharedPDFsPage() {
           <div className="relative flex-1 max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -582,14 +593,14 @@ export default function SharedPDFsPage() {
               placeholder="Search shared PDFs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background placeholder-muted-foreground focus:outline-none focus:placeholder-muted-foreground/70 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
             />
           </div>
 
           <div className="flex items-center gap-4">
             {/* Sort dropdown */}
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Sort by:</label>
+              <label className="text-sm text-foreground">Sort by:</label>
               <select
                 value={`${sortBy}-${sortDirection}`}
                 onChange={(e) => {
@@ -599,7 +610,7 @@ export default function SharedPDFsPage() {
                   setSortBy(newSortBy);
                   setSortDirection(newSortDirection);
                 }}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="border border-border rounded-md px-3 py-1 text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               >
                 <option value="date-desc">Newest first</option>
                 <option value="date-asc">Oldest first</option>
@@ -613,13 +624,13 @@ export default function SharedPDFsPage() {
             </div>
 
             {/* View toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center bg-muted rounded-lg p-1">
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === "grid"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-background shadow-sm text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
                 title="Grid view"
               >
@@ -641,8 +652,8 @@ export default function SharedPDFsPage() {
                 onClick={() => setViewMode("list")}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === "list"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-background shadow-sm text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
                 title="List view"
               >
@@ -666,8 +677,8 @@ export default function SharedPDFsPage() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
 
@@ -681,7 +692,7 @@ export default function SharedPDFsPage() {
       {!isLoading && filteredAndSortedPdfs.length === 0 && !error && (
         <div className="text-center py-12">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-muted-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -693,10 +704,10 @@ export default function SharedPDFsPage() {
               d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <h3 className="mt-2 text-sm font-medium text-foreground">
             {searchTerm ? "No PDFs found" : "No Shared PDFs"}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             {searchTerm
               ? `No PDFs match "${searchTerm}"`
               : "No PDFs have been shared with you yet"}

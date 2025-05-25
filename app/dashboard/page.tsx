@@ -314,182 +314,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Manage and collaborate on your PDF documents
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome back, {user?.displayName || user?.email?.split("@")[0]}!
           </p>
         </div>
 
-        <div className="relative flex-1 max-w-md">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg
-              className="h-5 w-5 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-          <input
-            type="text"
-            placeholder="Search PDFs..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-
-          {showSearchResults && (
-            <div className="absolute z-50 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-auto">
-              {searchResults.length > 0 ? (
-                <div className="py-1">
-                  {searchResults.map((pdf) => (
-                    <button
-                      key={pdf.id}
-                      onClick={() => handleSearchResultClick(pdf)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-3"
-                    >
-                      {pdf.thumbnailUrl ? (
-                        <Image
-                          src={pdf.thumbnailUrl}
-                          alt={`${pdf.name} thumbnail`}
-                          width={32}
-                          height={24}
-                          className="rounded object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-6 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                          <svg
-                            className="w-4 h-4 text-gray-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {pdf.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {pdf.isOwned
-                            ? "Owned by you"
-                            : `Shared by ${pdf.uploadedBy}`}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-4 py-2 text-sm text-gray-500">
-                  No PDFs found matching "{searchTerm}"
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4">
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="pdf-upload"
-            disabled={isUploading}
-          />
-          <label
-            htmlFor="pdf-upload"
-            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
-              isUploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            {isUploading ? "Uploading..." : "Upload PDF"}
-          </label>
-        </div>
-      </div>
-
-      {showSearchResults && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowSearchResults(false)}
-        />
-      )}
-
-      {isUploading && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-700">
-              Uploading PDF...
-            </span>
-            <span className="text-sm text-blue-600">
-              {Math.round(uploadProgress)}%
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div
-          className={`rounded-lg p-4 ${
-            error.includes("successfully")
-              ? "bg-green-50 border border-green-200 text-green-700"
-              : "bg-red-50 border border-red-200 text-red-700"
-          }`}
-        >
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          href="/dashboard/pdfs"
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">My PDFs</h3>
-              <p className="text-3xl font-bold text-indigo-600 mt-2">
-                {pdfStats.ownedCount}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">Documents owned</p>
-            </div>
-            <div className="p-3 bg-indigo-100 rounded-full">
+        <div className="mt-4 lg:mt-0 relative">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
-                className="w-6 h-6 text-indigo-600"
+                className="h-5 w-5 text-muted-foreground"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -498,7 +335,127 @@ export default function Dashboard() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Search PDFs..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onFocus={() => setShowSearchResults(true)}
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background placeholder-muted-foreground focus:outline-none focus:placeholder-muted-foreground/70 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
+            />
+          </div>
+          {showSearchResults && searchTerm && (
+            <div className="absolute z-50 mt-1 w-full bg-card rounded-md shadow-lg border border-border max-h-60 overflow-auto">
+              {searchResults.length > 0 ? (
+                searchResults.map((pdf) => (
+                  <button
+                    key={pdf.id}
+                    onClick={() => handleSearchResultClick(pdf)}
+                    className="w-full px-4 py-2 text-left hover:bg-accent flex items-center space-x-3"
+                  >
+                    <div className="flex-shrink-0">
+                      <svg
+                        className="w-5 h-5 text-muted-foreground"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-card-foreground truncate">
+                        {pdf.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(pdf.size)} •{" "}
+                        {formatDate(pdf.uploadedAt)}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-2 text-sm text-muted-foreground">
+                  No PDFs found
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Upload Progress */}
+      {isUploading && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-primary">
+              Uploading PDF...
+            </span>
+            <span className="text-sm text-primary">
+              {Math.round(uploadProgress)}%
+            </span>
+          </div>
+          <div className="w-full bg-primary/20 rounded-full h-2">
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {/* Error/Success Messages */}
+      {error && (
+        <div
+          className={`rounded-lg p-4 ${
+            error.includes("successfully")
+              ? "bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400"
+              : "bg-destructive/10 border border-destructive/20 text-destructive"
+          }`}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Link
+          href="/dashboard/pdfs"
+          className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-card-foreground">
+                My PDFs
+              </h3>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+                {pdfStats.ownedCount}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Documents owned
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+              <svg
+                className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                 />
               </svg>
             </div>
@@ -507,21 +464,23 @@ export default function Dashboard() {
 
         <Link
           href="/dashboard/shared"
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+          className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-card-foreground">
                 Shared with Me
               </h3>
-              <p className="text-3xl font-bold text-green-600 mt-2">
+              <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
                 {pdfStats.sharedCount}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Documents shared</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Documents shared
+              </p>
             </div>
-            <div className="p-3 bg-green-100 rounded-full">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
               <svg
-                className="w-6 h-6 text-green-600"
+                className="w-6 h-6 text-green-600 dark:text-green-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -537,13 +496,13 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-card-foreground">
                 Total Storage
               </h3>
-              <p className="text-3xl font-bold text-purple-600 mt-2">
+              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">
                 {formatFileSize(
                   [...ownedPdfs, ...sharedPdfs].reduce(
                     (total, pdf) => total + pdf.size,
@@ -551,11 +510,11 @@ export default function Dashboard() {
                   )
                 )}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Space used</p>
+              <p className="text-sm text-muted-foreground mt-1">Space used</p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-full">
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
               <svg
-                className="w-6 h-6 text-purple-600"
+                className="w-6 h-6 text-purple-600 dark:text-purple-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -572,165 +531,195 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
+      {/* Recent PDFs Section */}
+      <div className="bg-card rounded-lg shadow-sm border border-border">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Recent Activity
+            <h2 className="text-xl font-semibold text-card-foreground">
+              Recent PDFs
             </h2>
-            <Link
-              href="/dashboard/pdfs"
-              className="text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              View all →
-            </Link>
+            <div className="flex items-center space-x-2">
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="pdf-upload"
+                disabled={isUploading}
+              />
+              <label
+                htmlFor="pdf-upload"
+                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer ${
+                  isUploading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                {isUploading ? "Uploading..." : "Upload PDF"}
+              </label>
+            </div>
           </div>
         </div>
-
-        {recentPdfs.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-            {recentPdfs.slice(0, 6).map((pdf) => (
-              <div
-                key={pdf.id}
-                className="group cursor-pointer bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
-                onClick={() => setSelectedPdf(pdf)}
-              >
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    {pdf.thumbnailUrl ? (
-                      <Image
-                        src={pdf.thumbnailUrl}
-                        alt={`${pdf.name} thumbnail`}
-                        width={48}
-                        height={36}
-                        className="rounded object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-9 bg-gray-200 rounded flex items-center justify-center">
-                        <svg
-                          className="w-6 h-6 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+        <div className="p-6">
+          {recentPdfs.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentPdfs.slice(0, 6).map((pdf) => (
+                <div
+                  key={pdf.id}
+                  className="group cursor-pointer bg-muted/30 rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                  onClick={() => setSelectedPdf(pdf)}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      {pdf.thumbnailUrl ? (
+                        <Image
+                          src={pdf.thumbnailUrl}
+                          alt={`${pdf.name} thumbnail`}
+                          width={48}
+                          height={36}
+                          className="rounded object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-9 bg-muted rounded flex items-center justify-center">
+                          <svg
+                            className="w-6 h-6 text-muted-foreground"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-card-foreground truncate group-hover:text-primary">
+                        {pdf.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {pdf.isOwned
+                          ? "Owned by you"
+                          : `Shared by ${pdf.uploadedBy}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(pdf.uploadedAt)}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <Menu as="div" className="relative">
+                        <Menu.Button
+                          className="p-1 hover:bg-accent rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600">
-                      {pdf.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {pdf.isOwned
-                        ? "Owned by you"
-                        : `Shared by ${pdf.uploadedBy}`}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {formatDate(pdf.uploadedAt)}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <Menu as="div" className="relative">
-                      <Menu.Button
-                        className="p-1 hover:bg-gray-200 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <svg
-                          className="w-4 h-4 text-gray-500"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                          />
-                        </svg>
-                      </Menu.Button>
-                      <Menu.Items className="absolute right-0 z-10 mt-1 w-32 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        <div className="py-1">
-                          {pdf.isOwned && (
+                          <svg
+                            className="w-4 h-4 text-muted-foreground"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                            />
+                          </svg>
+                        </Menu.Button>
+                        <Menu.Items className="absolute right-0 z-10 mt-1 w-32 origin-top-right rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
+                          <div className="py-1">
+                            {pdf.isOwned && (
+                              <Menu.Item>
+                                {({ active }) => (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSharingPdf(pdf);
+                                    }}
+                                    className={`${
+                                      active ? "bg-accent" : ""
+                                    } block px-4 py-2 text-sm text-popover-foreground w-full text-left`}
+                                  >
+                                    Share
+                                  </button>
+                                )}
+                              </Menu.Item>
+                            )}
                             <Menu.Item>
                               {({ active }) => (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setSharingPdf(pdf);
+                                    handleDownload(pdf);
                                   }}
                                   className={`${
-                                    active ? "bg-gray-100" : ""
-                                  } block px-4 py-2 text-sm text-gray-700 w-full text-left`}
+                                    active ? "bg-accent" : ""
+                                  } block px-4 py-2 text-sm text-popover-foreground w-full text-left`}
                                 >
-                                  Share
+                                  Download
                                 </button>
                               )}
                             </Menu.Item>
-                          )}
-                          <Menu.Item>
-                            {({ active }) => (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownload(pdf);
-                                }}
-                                className={`${
-                                  active ? "bg-gray-100" : ""
-                                } block px-4 py-2 text-sm text-gray-700 w-full text-left`}
-                              >
-                                Download
-                              </button>
-                            )}
-                          </Menu.Item>
-                        </div>
-                      </Menu.Items>
-                    </Menu>
+                          </div>
+                        </Menu.Items>
+                      </Menu>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-12 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No PDFs yet
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by uploading your first PDF document.
-            </p>
-          </div>
-        )}
+              ))}
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <svg
+                className="mx-auto h-12 w-12 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-card-foreground">
+                No PDFs yet
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Get started by uploading your first PDF document.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* My PDFs and Shared PDFs Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-border">
+          <div className="px-6 py-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">My PDFs</h2>
+              <h2 className="text-lg font-semibold text-card-foreground">
+                My PDFs
+              </h2>
               <Link
                 href="/dashboard/pdfs"
-                className="text-sm text-indigo-600 hover:text-indigo-500"
+                className="text-sm text-primary hover:text-primary/80"
               >
                 View all →
               </Link>
@@ -742,7 +731,7 @@ export default function Dashboard() {
                 {ownedPdfs.slice(0, 4).map((pdf) => (
                   <div
                     key={pdf.id}
-                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-accent cursor-pointer"
                     onClick={() => setSelectedPdf(pdf)}
                   >
                     {pdf.thumbnailUrl ? (
@@ -754,9 +743,9 @@ export default function Dashboard() {
                         className="rounded object-cover"
                       />
                     ) : (
-                      <div className="w-8 h-6 bg-gray-200 rounded flex items-center justify-center">
+                      <div className="w-8 h-6 bg-muted rounded flex items-center justify-center">
                         <svg
-                          className="w-4 h-4 text-gray-400"
+                          className="w-4 h-4 text-muted-foreground"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -771,36 +760,36 @@ export default function Dashboard() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-card-foreground truncate">
                         {pdf.name}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {formatDate(pdf.uploadedAt)}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {formatFileSize(pdf.size)}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">
+              <p className="text-muted-foreground text-center py-4">
                 No PDFs uploaded yet
               </p>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-border">
+          <div className="px-6 py-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-card-foreground">
                 Shared with Me
               </h2>
               <Link
                 href="/dashboard/shared"
-                className="text-sm text-indigo-600 hover:text-indigo-500"
+                className="text-sm text-primary hover:text-primary/80"
               >
                 View all →
               </Link>
@@ -812,7 +801,7 @@ export default function Dashboard() {
                 {sharedPdfs.slice(0, 4).map((pdf) => (
                   <div
                     key={pdf.id}
-                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-accent cursor-pointer"
                     onClick={() => setSelectedPdf(pdf)}
                   >
                     {pdf.thumbnailUrl ? (
@@ -824,9 +813,9 @@ export default function Dashboard() {
                         className="rounded object-cover"
                       />
                     ) : (
-                      <div className="w-8 h-6 bg-gray-200 rounded flex items-center justify-center">
+                      <div className="w-8 h-6 bg-muted rounded flex items-center justify-center">
                         <svg
-                          className="w-4 h-4 text-gray-400"
+                          className="w-4 h-4 text-muted-foreground"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -841,21 +830,21 @@ export default function Dashboard() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-card-foreground truncate">
                         {pdf.name}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        by {pdf.uploadedBy}
+                      <p className="text-xs text-muted-foreground">
+                        Shared by {pdf.uploadedBy}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {formatFileSize(pdf.size)}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">
+              <p className="text-muted-foreground text-center py-4">
                 No shared PDFs yet
               </p>
             )}
