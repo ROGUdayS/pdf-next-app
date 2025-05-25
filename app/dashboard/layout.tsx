@@ -20,7 +20,8 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
       if (window.innerWidth >= 768) {
         setIsSidebarOpen(false);
       }
@@ -119,16 +120,16 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
       <nav className="bg-card shadow-sm fixed w-full z-10 border-b border-border">
-        <div className="max-w-full px-4 sm:px-6">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+        <div className="max-w-full px-3 sm:px-4 lg:px-6">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center min-w-0">
               {isMobile && (
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none md:hidden"
+                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none md:hidden mr-2"
                 >
                   <svg
-                    className="h-6 w-6"
+                    className="h-5 w-5 sm:h-6 sm:w-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -142,11 +143,11 @@ export default function DashboardLayout({
                   </svg>
                 </button>
               )}
-              <span className="ml-4 text-xl font-bold text-foreground">
+              <span className="text-lg sm:text-xl font-bold text-foreground truncate">
                 PDF Culture
               </span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <ThemeToggle />
               <UserProfileMenu />
             </div>
@@ -156,13 +157,13 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 top-16 h-full bg-card shadow-sm border-r border-border transition-all duration-300 
+        className={`fixed left-0 top-14 sm:top-16 h-full bg-card shadow-sm border-r border-border transition-all duration-300 z-20
           ${
             isMobile
               ? isSidebarOpen
                 ? "w-64 translate-x-0"
                 : "-translate-x-full w-64"
-              : "w-16"
+              : "w-16 translate-x-0"
           } 
           md:translate-x-0`}
       >
@@ -171,7 +172,8 @@ export default function DashboardLayout({
             <Tooltip key={item.name} content={item.name} side="right">
               <Link
                 href={item.href}
-                className={`flex items-center px-4 py-3 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg mx-2
+                onClick={() => isMobile && setIsSidebarOpen(false)}
+                className={`flex items-center px-3 sm:px-4 py-3 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg mx-2 transition-colors
                   ${
                     isMobile && isSidebarOpen
                       ? "justify-start"
@@ -194,17 +196,17 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div
-        className={`pt-16 ${
+        className={`pt-14 sm:pt-16 transition-all duration-300 ${
           isMobile ? (isSidebarOpen ? "pl-64" : "pl-0") : "pl-16"
-        } transition-all duration-300`}
+        }`}
       >
-        <main className="p-6">{children}</main>
+        <main className="p-3 sm:p-4 lg:p-6">{children}</main>
       </div>
 
       {/* Mobile Overlay */}
       {isMobile && isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[5]"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[15] top-14 sm:top-16"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
