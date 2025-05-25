@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import Image from "next/image";
 import { storage } from "@/lib/firebase";
@@ -228,10 +227,12 @@ export default function UserProfileMenu() {
 
       // Force a re-render after successful upload
       window.location.reload();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error uploading photo:", error);
       setImageError(true);
-      setUploadStatus(`Error: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+      setUploadStatus(`Error: ${errorMessage}`);
       // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -248,7 +249,7 @@ export default function UserProfileMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsMenuOpen(!isMenuOpen)}
-        className="flex items-center space-x-3 px-3 py-2 rounded-full transition-all duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        className="flex items-center space-x-3 px-3 py-2 rounded-full transition-all duration-200 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
       >
         <AvatarWithUpload
           user={user}
@@ -259,16 +260,16 @@ export default function UserProfileMenu() {
           showUploadHover={true}
         />
         <div className="flex flex-col items-start">
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-foreground">
             {displayName}
           </span>
-          <span className="text-xs text-gray-500 truncate max-w-[150px]">
+          <span className="text-xs text-muted-foreground truncate max-w-[150px]">
             {user?.email}
           </span>
         </div>
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+          className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
             isMenuOpen ? "rotate-180" : ""
           }`}
           fill="none"
@@ -293,8 +294,8 @@ export default function UserProfileMenu() {
       />
 
       {isMenuOpen && (
-        <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg py-2 bg-white ring-1 ring-black ring-opacity-5 transform opacity-100 scale-100 transition-all duration-200 ease-out origin-top-right">
-          <div className="px-4 py-3 border-b border-gray-100">
+        <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg py-2 bg-popover ring-1 ring-border transform opacity-100 scale-100 transition-all duration-200 ease-out origin-top-right">
+          <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center space-x-3">
               <AvatarWithUpload
                 user={user}
@@ -305,16 +306,16 @@ export default function UserProfileMenu() {
                 showUploadHover={true}
               />
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-gray-900">
+                <span className="text-sm font-semibold text-popover-foreground">
                   {displayName}
                 </span>
-                <span className="text-xs text-gray-500 truncate max-w-[180px]">
+                <span className="text-xs text-muted-foreground truncate max-w-[180px]">
                   {user?.email}
                 </span>
                 {uploadStatus && (
                   <span
                     className={`text-xs mt-1 ${
-                      imageError ? "text-red-500" : "text-blue-500"
+                      imageError ? "text-destructive" : "text-primary"
                     }`}
                   >
                     {uploadStatus}
@@ -326,11 +327,11 @@ export default function UserProfileMenu() {
 
           <button
             onClick={() => logout()}
-            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+            className="flex items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors duration-150"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4 mr-3 text-red-500"
+              className="w-4 h-4 mr-3 text-destructive"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

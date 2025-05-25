@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function DashboardLayout({
   children,
@@ -40,10 +41,10 @@ export default function DashboardLayout({
   // Show loading spinner while authentication is being determined
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -115,16 +116,16 @@ export default function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top Navigation */}
-      <nav className="bg-white shadow-sm fixed w-full z-10">
+      <nav className="bg-card shadow-sm fixed w-full z-10 border-b border-border">
         <div className="max-w-full px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               {isMobile && (
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none md:hidden"
+                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none md:hidden"
                 >
                   <svg
                     className="h-6 w-6"
@@ -141,18 +142,21 @@ export default function DashboardLayout({
                   </svg>
                 </button>
               )}
-              <span className="ml-4 text-xl font-bold text-gray-900">
+              <span className="ml-4 text-xl font-bold text-foreground">
                 PDF Culture
               </span>
             </div>
-            <UserProfileMenu />
+            <div className="flex items-center space-x-3">
+              <ThemeToggle />
+              <UserProfileMenu />
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 top-16 h-full bg-white shadow-sm transition-all duration-300 
+        className={`fixed left-0 top-16 h-full bg-card shadow-sm border-r border-border transition-all duration-300 
           ${
             isMobile
               ? isSidebarOpen
@@ -167,7 +171,7 @@ export default function DashboardLayout({
             <Tooltip key={item.name} content={item.name} side="right">
               <Link
                 href={item.href}
-                className={`flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg mx-2
+                className={`flex items-center px-4 py-3 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg mx-2
                   ${
                     isMobile && isSidebarOpen
                       ? "justify-start"

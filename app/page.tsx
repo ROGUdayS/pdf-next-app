@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   const { user, signInWithGoogle } = useAuth();
@@ -30,17 +31,18 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className="text-xl font-bold text-gray-900">
+              <span className="text-xl font-bold text-foreground">
                 PDF Culture
               </span>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/signin">Sign In</Link>
               </Button>
@@ -56,13 +58,13 @@ export default function Home() {
       <main className="pt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl lg:text-7xl">
+            <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
               <span className="block">Share PDFs,</span>
               <span className="block mt-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                 Collaborate Seamlessly
               </span>
             </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600 max-w-2xl mx-auto">
+            <p className="mt-6 text-lg leading-8 text-muted-foreground max-w-2xl mx-auto">
               Upload, share, and collaborate on PDF documents with advanced
               viewing, real-time commenting, and secure sharing controls.
               Perfect for teams, students, and professionals.
@@ -76,10 +78,10 @@ export default function Home() {
 
               <div className="relative w-full max-w-sm">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
+                  <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-gradient-to-b from-white to-gray-50 text-gray-500">
+                  <span className="px-2 bg-gradient-to-b from-background to-muted/20 text-muted-foreground">
                     or continue with
                   </span>
                 </div>
@@ -123,17 +125,19 @@ export default function Home() {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="relative group rounded-2xl border border-gray-200 bg-white p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
+                className="relative group rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20">
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-card-foreground">
                     {feature.title}
                   </h3>
                 </div>
-                <p className="mt-4 text-gray-500">{feature.description}</p>
+                <p className="mt-4 text-muted-foreground">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -141,9 +145,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-24 bg-white border-t border-gray-200">
+      <footer className="mt-24 bg-card border-t border-border">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-gray-500 text-sm">
+          <div className="text-center text-muted-foreground text-sm">
             © 2025 PDF Culture. All rights reserved.
           </div>
         </div>

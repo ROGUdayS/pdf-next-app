@@ -854,7 +854,7 @@ export default function PDFsPage() {
       {pdfs.map((pdf) => (
         <div
           key={pdf.id}
-          className="bg-white rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200"
+          className="bg-card rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200 border border-border"
         >
           {/* Thumbnail and content section */}
           <div className="cursor-pointer" onClick={() => setSelectedPdf(pdf)}>
@@ -887,7 +887,7 @@ export default function PDFsPage() {
             ) : (
               <div className="pdf-fallback">
                 <svg
-                  className="w-12 h-12 text-gray-400 mb-2"
+                  className="w-12 h-12 text-muted-foreground mb-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -899,7 +899,9 @@ export default function PDFsPage() {
                     d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                   />
                 </svg>
-                <span className="text-sm text-gray-400">PDF Preview</span>
+                <span className="text-sm text-muted-foreground">
+                  PDF Preview
+                </span>
               </div>
             )}
           </div>
@@ -907,15 +909,15 @@ export default function PDFsPage() {
           <div className="p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0 pr-4">
-                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                <h3 className="text-lg font-semibold text-card-foreground truncate">
                   {pdf.name}
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {pdf.uploadedBy === user?.email
                     ? "Owned by you"
                     : `Shared by ${pdf.uploadedBy}`}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {new Date(pdf.uploadedAt).toLocaleDateString()}
                 </p>
               </div>
@@ -923,9 +925,9 @@ export default function PDFsPage() {
               {/* Actions menu */}
               <div className="relative flex-shrink-0">
                 <Menu as="div" className="relative inline-block text-left">
-                  <Menu.Button className="p-2 hover:bg-gray-100 rounded-full">
+                  <Menu.Button className="p-2 hover:bg-accent rounded-full">
                     <svg
-                      className="w-5 h-5 text-gray-500"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -939,7 +941,7 @@ export default function PDFsPage() {
                     </svg>
                   </Menu.Button>
 
-                  <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
                       {/* Share option only for owned PDFs */}
                       {pdf.uploadedBy === user?.email && (
@@ -951,11 +953,11 @@ export default function PDFsPage() {
                                 setSharingPdf(pdf);
                               }}
                               className={`${
-                                active ? "bg-gray-100" : ""
-                              } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                                active ? "bg-accent" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                             >
                               <svg
-                                className="mr-3 h-5 w-5 text-gray-400"
+                                className="mr-3 h-5 w-5 text-muted-foreground"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -983,11 +985,11 @@ export default function PDFsPage() {
                               setNewName(pdf.name);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-gray-400"
+                              className="mr-3 h-5 w-5 text-muted-foreground"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1013,11 +1015,11 @@ export default function PDFsPage() {
                               handleDownload(pdf);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-gray-400"
+                              className="mr-3 h-5 w-5 text-muted-foreground"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1043,11 +1045,11 @@ export default function PDFsPage() {
                               setDeletingPdfId(pdf.id);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700 text-red-600`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-destructive`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-red-400"
+                              className="mr-3 h-5 w-5 text-destructive"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1076,9 +1078,9 @@ export default function PDFsPage() {
 
   // List view component
   const ListView = ({ pdfs }: { pdfs: PdfFile[] }) => (
-    <div className="bg-white shadow-sm rounded-lg overflow-visible">
-      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 uppercase tracking-wider">
+    <div className="bg-card shadow-sm rounded-lg overflow-visible border border-border">
+      <div className="px-6 py-3 bg-muted border-b border-border">
+        <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground uppercase tracking-wider">
           <div className="col-span-1"></div>
           <div className="col-span-4">Name</div>
           <div className="col-span-2">Size</div>
@@ -1087,11 +1089,11 @@ export default function PDFsPage() {
           <div className="col-span-1"></div>
         </div>
       </div>
-      <div className="divide-y divide-gray-200">
+      <div className="divide-y divide-border">
         {pdfs.map((pdf) => (
           <div
             key={pdf.id}
-            className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            className="px-6 py-4 hover:bg-accent cursor-pointer transition-colors"
             onClick={() => setSelectedPdf(pdf)}
           >
             <div className="grid grid-cols-12 gap-4 items-center">
@@ -1105,9 +1107,9 @@ export default function PDFsPage() {
                     className="rounded object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-8 bg-gray-100 rounded flex items-center justify-center">
+                  <div className="w-10 h-8 bg-muted rounded flex items-center justify-center">
                     <svg
-                      className="w-5 h-5 text-gray-400"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1123,33 +1125,33 @@ export default function PDFsPage() {
                 )}
               </div>
               <div className="col-span-4">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-card-foreground truncate">
                   {pdf.name}
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatFileSize(pdf.size)}
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {pdf.uploadedBy === user?.email ? "You" : pdf.uploadedBy}
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatDate(pdf.uploadedAt)}
                 </p>
               </div>
               <div className="col-span-1">
                 <Menu as="div" className="relative inline-block text-left">
                   <Menu.Button
-                    className="p-2 hover:bg-gray-200 rounded-full"
+                    className="p-2 hover:bg-accent rounded-full"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <svg
-                      className="w-5 h-5 text-gray-500"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1163,7 +1165,7 @@ export default function PDFsPage() {
                     </svg>
                   </Menu.Button>
 
-                  <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
                       {/* Same menu items as grid view */}
                       {pdf.uploadedBy === user?.email && (
@@ -1175,11 +1177,11 @@ export default function PDFsPage() {
                                 setSharingPdf(pdf);
                               }}
                               className={`${
-                                active ? "bg-gray-100" : ""
-                              } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                                active ? "bg-accent" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                             >
                               <svg
-                                className="mr-3 h-5 w-5 text-gray-400"
+                                className="mr-3 h-5 w-5 text-muted-foreground"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -1206,11 +1208,11 @@ export default function PDFsPage() {
                               setNewName(pdf.name);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-gray-400"
+                              className="mr-3 h-5 w-5 text-muted-foreground"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1235,11 +1237,11 @@ export default function PDFsPage() {
                               handleDownload(pdf);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-popover-foreground`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-gray-400"
+                              className="mr-3 h-5 w-5 text-muted-foreground"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1264,11 +1266,11 @@ export default function PDFsPage() {
                               setDeletingPdfId(pdf.id);
                             }}
                             className={`${
-                              active ? "bg-gray-100" : ""
-                            } flex w-full items-center px-4 py-2 text-sm text-gray-700 text-red-600`}
+                              active ? "bg-accent" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-destructive`}
                           >
                             <svg
-                              className="mr-3 h-5 w-5 text-red-400"
+                              className="mr-3 h-5 w-5 text-destructive"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1328,14 +1330,16 @@ export default function PDFsPage() {
       {/* Rename Dialog */}
       {renamingPdfId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h2 className="text-xl font-bold mb-4">Rename PDF</h2>
+          <div className="bg-card rounded-lg p-6 w-96 border border-border">
+            <h2 className="text-xl font-bold mb-4 text-card-foreground">
+              Rename PDF
+            </h2>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Enter new name"
-              className="w-full px-3 py-2 border rounded-md mb-4"
+              className="w-full px-3 py-2 border border-border rounded-md mb-4 bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               autoFocus
             />
             <div className="flex justify-end space-x-3">
@@ -1344,7 +1348,7 @@ export default function PDFsPage() {
                   setRenamingPdfId(null);
                   setNewName("");
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -1357,7 +1361,7 @@ export default function PDFsPage() {
                   setRenamingPdfId(null);
                 }}
                 disabled={!newName.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
               >
                 Rename
               </button>
@@ -1369,16 +1373,18 @@ export default function PDFsPage() {
       {/* Delete Confirmation Dialog */}
       {deletingPdfId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h2 className="text-xl font-bold mb-4">Delete PDF</h2>
-            <p className="mb-4">
+          <div className="bg-card rounded-lg p-6 w-96 border border-border">
+            <h2 className="text-xl font-bold mb-4 text-card-foreground">
+              Delete PDF
+            </h2>
+            <p className="mb-4 text-card-foreground">
               Are you sure you want to delete this PDF? This action cannot be
               undone.
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setDeletingPdfId(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -1390,7 +1396,7 @@ export default function PDFsPage() {
                   }
                   setDeletingPdfId(null);
                 }}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
               >
                 Delete
               </button>
@@ -1402,7 +1408,7 @@ export default function PDFsPage() {
       {/* Header with search, view toggle, and upload */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">My PDFs</h1>
+          <h1 className="text-3xl font-bold text-foreground">My PDFs</h1>
           <div className="flex items-center gap-4">
             <input
               type="file"
@@ -1414,7 +1420,7 @@ export default function PDFsPage() {
             />
             <label
               htmlFor="pdf-upload"
-              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer ${
                 isUploading ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
@@ -1442,7 +1448,7 @@ export default function PDFsPage() {
           <div className="relative flex-1 max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -1460,14 +1466,14 @@ export default function PDFsPage() {
               placeholder="Search PDFs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background placeholder-muted-foreground focus:outline-none focus:placeholder-muted-foreground/70 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
             />
           </div>
 
           <div className="flex items-center gap-4">
             {/* Sort dropdown */}
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Sort by:</label>
+              <label className="text-sm text-foreground">Sort by:</label>
               <select
                 value={`${sortBy}-${sortDirection}`}
                 onChange={(e) => {
@@ -1477,7 +1483,7 @@ export default function PDFsPage() {
                   setSortBy(newSortBy);
                   setSortDirection(newSortDirection);
                 }}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="border border-border rounded-md px-3 py-1 text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               >
                 <option value="date-desc">Newest first</option>
                 <option value="date-asc">Oldest first</option>
@@ -1489,13 +1495,13 @@ export default function PDFsPage() {
             </div>
 
             {/* View toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center bg-muted rounded-lg p-1">
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === "grid"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-background shadow-sm text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
                 title="Grid view"
               >
@@ -1517,8 +1523,8 @@ export default function PDFsPage() {
                 onClick={() => setViewMode("list")}
                 className={`p-2 rounded-md transition-colors ${
                   viewMode === "list"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-background shadow-sm text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
                 title="List view"
               >
@@ -1543,21 +1549,21 @@ export default function PDFsPage() {
 
       {/* Error message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
 
       {/* Upload Progress */}
       {isUploading && (
         <div className="mb-6">
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-muted rounded-full h-2.5">
             <div
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+              className="bg-primary h-2.5 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             ></div>
           </div>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Uploading... {uploadProgress.toFixed(0)}%
           </p>
         </div>
@@ -1566,8 +1572,8 @@ export default function PDFsPage() {
       {/* Loading state */}
       {isInitialLoading && (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading PDFs...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading PDFs...</p>
         </div>
       )}
 
@@ -1586,7 +1592,7 @@ export default function PDFsPage() {
       {!isInitialLoading && filteredAndSortedPdfs.length === 0 && !error && (
         <div className="text-center py-12">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-muted-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1598,10 +1604,10 @@ export default function PDFsPage() {
               d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <h3 className="mt-2 text-sm font-medium text-foreground">
             {searchTerm ? "No PDFs found" : "No PDFs"}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             {searchTerm
               ? `No PDFs match "${searchTerm}"`
               : "Upload your first PDF to get started"}
