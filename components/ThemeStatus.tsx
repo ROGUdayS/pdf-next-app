@@ -8,10 +8,13 @@ export function ThemeStatus() {
 
   const getTimeBasedInfo = () => {
     const hour = new Date().getHours();
-    const timeString = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const timeString = new Date()
+      .toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+      .toLowerCase();
     const isDarkTime = hour >= 18 || hour < 6;
 
     return {

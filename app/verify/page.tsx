@@ -1,32 +1,32 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { useAuth } from '@/contexts/AuthContext';
-import { updateProfile } from 'firebase/auth';
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { useAuth } from "@/contexts/AuthContext";
+import { updateProfile } from "firebase/auth";
 
 export default function VerifyEmail() {
-  const [otp, setOtp] = useState('');
-  const [error, setError] = useState('');
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get('email');
+  const email = searchParams.get("email");
   const { signUp } = useAuth();
 
   useEffect(() => {
     if (!email) {
-      router.push('/signup');
+      router.push("/signup");
       return;
     }
 
     // Check if we have signup data
-    const signupData = sessionStorage.getItem('signupData');
+    const signupData = sessionStorage.getItem("signupData");
     if (!signupData) {
-      router.push('/signup');
+      router.push("/signup");
       return;
     }
 
@@ -47,26 +47,26 @@ export default function VerifyEmail() {
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   const handleResendOTP = async () => {
     try {
       setLoading(true);
-      setError('');
-      
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
+      setError("");
+
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send OTP');
+        throw new Error(data.error || "Failed to send OTP");
       }
 
       // Reset countdown
@@ -80,54 +80,57 @@ export default function VerifyEmail() {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!otp) {
-      setError('Please enter the verification code');
+      setError("Please enter the verification code");
       return;
     }
 
     try {
       setLoading(true);
-      setError('');
+      setError("");
 
       // Verify OTP
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'PUT',
+      const response = await fetch("/api/auth/send-otp", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, otp }),
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid verification code');
+        throw new Error(data.error || "Invalid verification code");
       }
 
       // Get signup data from session storage
-      const signupDataStr = sessionStorage.getItem('signupData');
+      const signupDataStr = sessionStorage.getItem("signupData");
       if (!signupDataStr) {
-        throw new Error('Signup data not found');
+        throw new Error("Signup data not found");
       }
 
       const signupData = JSON.parse(signupDataStr);
 
       // Create the account
-      const userCredential = await signUp(signupData.email, signupData.password);
-      
+      const userCredential = await signUp(
+        signupData.email,
+        signupData.password
+      );
+
       // Update the user's display name
       if (userCredential.user) {
         await updateProfile(userCredential.user, {
-          displayName: `${signupData.firstName} ${signupData.lastName}`
+          displayName: `${signupData.firstName} ${signupData.lastName}`,
         });
       }
 
       // Clear signup data from session storage
-      sessionStorage.removeItem('signupData');
+      sessionStorage.removeItem("signupData");
 
       // Redirect to dashboard
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -143,7 +146,7 @@ export default function VerifyEmail() {
             Verify your email
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            We've sent a verification code to{' '}
+            We've sent a verification code to{" "}
             <span className="font-medium text-indigo-600">{email}</span>
           </p>
         </div>
@@ -156,7 +159,10 @@ export default function VerifyEmail() {
           )}
 
           <div>
-            <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="otp"
+              className="block text-sm font-medium text-gray-700"
+            >
               Verification Code
             </label>
             <div className="mt-1">
@@ -180,7 +186,7 @@ export default function VerifyEmail() {
               className="w-full"
               disabled={loading || countdown === 0}
             >
-              {loading ? 'Verifying...' : 'Verify Email'}
+              {loading ? "Verifying..." : "Verify Email"}
             </Button>
           </div>
 
@@ -205,4 +211,4 @@ export default function VerifyEmail() {
       </div>
     </div>
   );
-} 
+}
