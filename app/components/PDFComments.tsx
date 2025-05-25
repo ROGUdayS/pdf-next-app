@@ -212,6 +212,27 @@ export default function PDFComments({
     }
   };
 
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLDivElement>,
+    isReply = false,
+    commentId?: string
+  ) => {
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        // Shift+Enter: Allow default behavior (new line)
+        return;
+      } else {
+        // Enter: Send comment/reply
+        e.preventDefault();
+        if (isReply && commentId) {
+          addReply(commentId);
+        } else if (!isReply) {
+          addComment();
+        }
+      }
+    }
+  };
+
   const addComment = async () => {
     if (!newComment.trim() || !auth.currentUser) return;
     const finalHtml = convertBullets(newComment);
@@ -498,6 +519,7 @@ export default function PDFComments({
                     ref={replyEditorRef}
                     contentEditable
                     onInput={(e) => handleInput(e, true)}
+                    onKeyDown={(e) => handleKeyDown(e, true, c.id)}
                     className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[2.5rem] md:min-h-[3rem] bg-background text-foreground text-sm md:text-base"
                   />
                   <button
@@ -576,6 +598,7 @@ export default function PDFComments({
             ref={editorRef}
             contentEditable
             onInput={(e) => handleInput(e, false)}
+            onKeyDown={(e) => handleKeyDown(e, false)}
             className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[2.5rem] md:min-h-[3rem] bg-background text-foreground text-sm md:text-base"
           />
           <button

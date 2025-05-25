@@ -250,6 +250,8 @@ export default function UserProfileMenu() {
       <button
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         className="flex items-center space-x-3 px-3 py-2 rounded-full transition-all duration-200 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        aria-label="Open user menu"
+        aria-expanded={isMenuOpen}
       >
         <AvatarWithUpload
           user={user}
@@ -275,6 +277,7 @@ export default function UserProfileMenu() {
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -285,12 +288,17 @@ export default function UserProfileMenu() {
         </svg>
       </button>
 
+      <label htmlFor="profile-photo-upload" className="sr-only">
+        Upload profile photo
+      </label>
       <input
+        id="profile-photo-upload"
         type="file"
         ref={fileInputRef}
         onChange={handlePhotoUpload}
         accept="image/*"
         className="hidden"
+        aria-label="Upload profile photo"
       />
 
       {isMenuOpen && (
@@ -328,6 +336,7 @@ export default function UserProfileMenu() {
           <button
             onClick={() => logout()}
             className="flex items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors duration-150"
+            aria-label="Sign out of account"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -335,6 +344,7 @@ export default function UserProfileMenu() {
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
