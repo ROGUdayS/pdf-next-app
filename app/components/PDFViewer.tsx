@@ -418,12 +418,14 @@ export default function PDFViewer({
                     disabled={pageNumber <= 1}
                     className="p-2 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
                     title="Previous page"
+                    aria-label="Go to previous page"
                   >
                     <svg
                       className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -438,7 +440,14 @@ export default function PDFViewer({
                     onSubmit={handleJumpToPage}
                     className="flex items-center space-x-1"
                   >
+                    <label
+                      htmlFor="page-number-input-mobile"
+                      className="sr-only"
+                    >
+                      Page number
+                    </label>
                     <input
+                      id="page-number-input-mobile"
                       type="number"
                       value={jumpToPage}
                       onChange={(e) => setJumpToPage(e.target.value)}
@@ -446,6 +455,7 @@ export default function PDFViewer({
                       placeholder={`${pageNumber}`}
                       min={1}
                       max={numPages || 1}
+                      aria-label="Jump to page number"
                     />
                     <span className="text-sm text-foreground">
                       /{numPages || "?"}
@@ -457,12 +467,14 @@ export default function PDFViewer({
                     disabled={pageNumber >= (numPages || 1)}
                     className="p-2 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
                     title="Next page"
+                    aria-label="Go to next page"
                   >
                     <svg
                       className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -487,12 +499,14 @@ export default function PDFViewer({
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="p-2 hover:bg-secondary rounded-md text-foreground"
                 title="More options"
+                aria-label="Show more options"
               >
                 <svg
                   className="w-5 h-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -507,12 +521,14 @@ export default function PDFViewer({
                 onClick={onClose}
                 className="p-2 hover:bg-secondary rounded-md text-foreground"
                 title="Close"
+                aria-label="Close PDF viewer"
               >
                 <svg
                   className="w-5 h-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -540,12 +556,14 @@ export default function PDFViewer({
                         : "hover:bg-secondary text-foreground"
                     }`}
                     title="Single page view"
+                    aria-label="Switch to single page view"
                   >
                     <svg
                       className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -563,12 +581,14 @@ export default function PDFViewer({
                         : "hover:bg-secondary text-foreground"
                     }`}
                     title="Continuous scroll view"
+                    aria-label="Switch to continuous scroll view"
                   >
                     <svg
                       className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -588,6 +608,7 @@ export default function PDFViewer({
                   <button
                     onClick={() => changeScale(-0.1)}
                     className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                    aria-label="Zoom out"
                   >
                     -
                   </button>
@@ -597,6 +618,7 @@ export default function PDFViewer({
                   <button
                     onClick={() => changeScale(0.1)}
                     className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                    aria-label="Zoom in"
                   >
                     +
                   </button>
@@ -781,7 +803,14 @@ export default function PDFViewer({
                   onSubmit={handleJumpToPage}
                   className="flex items-center space-x-2"
                 >
+                  <label
+                    htmlFor="page-number-input-desktop"
+                    className="sr-only"
+                  >
+                    Page number
+                  </label>
                   <input
+                    id="page-number-input-desktop"
                     type="number"
                     value={jumpToPage}
                     onChange={(e) => setJumpToPage(e.target.value)}
@@ -789,6 +818,7 @@ export default function PDFViewer({
                     placeholder={`${pageNumber}`}
                     min={1}
                     max={numPages || 1}
+                    aria-label="Jump to page number"
                   />
                   <span className="text-foreground">/ {numPages || "?"}</span>
                 </form>
@@ -820,6 +850,7 @@ export default function PDFViewer({
                     : "hover:bg-secondary text-foreground"
                 }`}
                 title="Single page view"
+                aria-label="Switch to single page view"
               >
                 <svg
                   className="w-5 h-5"
@@ -843,6 +874,7 @@ export default function PDFViewer({
                     : "hover:bg-secondary text-foreground"
                 }`}
                 title="Continuous scroll view"
+                aria-label="Switch to continuous scroll view"
               >
                 <svg
                   className="w-5 h-5"
@@ -867,6 +899,7 @@ export default function PDFViewer({
                 onClick={() => changeScale(-0.1)}
                 className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                 title="Zoom out (-)"
+                aria-label="Zoom out"
               >
                 -
               </button>
@@ -877,6 +910,7 @@ export default function PDFViewer({
                 onClick={() => changeScale(0.1)}
                 className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                 title="Zoom in (+)"
+                aria-label="Zoom in"
               >
                 +
               </button>
@@ -886,6 +920,7 @@ export default function PDFViewer({
               onClick={toggleFit}
               className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
               title={fitMode === "width" ? "Fit to page" : "Fit to width"}
+              aria-label={fitMode === "width" ? "Fit to page" : "Fit to width"}
             >
               {fitMode === "width" ? "Fit Page" : "Fit Width"}
             </button>
@@ -896,12 +931,14 @@ export default function PDFViewer({
               onClick={() => rotatePages(90)}
               className="p-2 hover:bg-secondary rounded-md text-foreground"
               title="Rotate"
+              aria-label="Rotate pages 90 degrees"
             >
               <svg
                 className="w-5 h-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -920,12 +957,14 @@ export default function PDFViewer({
               }`}
               title="Toggle side-by-side view"
               disabled={viewMode === "continuous"}
+              aria-label="Toggle side-by-side view"
             >
               <svg
                 className="w-5 h-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"

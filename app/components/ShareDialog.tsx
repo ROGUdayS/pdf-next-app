@@ -98,7 +98,7 @@ export default function ShareDialog({
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
                 >
-                  Share "{pdfName}"
+                  Share &ldquo;{pdfName}&rdquo;
                 </Dialog.Title>
 
                 {/* Permissions Section */}
@@ -147,18 +147,24 @@ export default function ShareDialog({
                   </h4>
                   <form onSubmit={handleEmailShare} className="mt-2">
                     <div className="flex gap-2">
+                      <label htmlFor="email-input" className="sr-only">
+                        Email address
+                      </label>
                       <input
+                        id="email-input"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="Enter email address"
                         className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         disabled={isLoading}
+                        aria-label="Email address to share PDF with"
                       />
                       <button
                         type="submit"
                         disabled={isLoading || !email}
                         className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        aria-label="Share PDF via email"
                       >
                         Share
                       </button>
@@ -174,15 +180,21 @@ export default function ShareDialog({
                   <div className="mt-2">
                     {shareLink ? (
                       <div className="flex gap-2">
+                        <label htmlFor="share-link-input" className="sr-only">
+                          Generated share link
+                        </label>
                         <input
+                          id="share-link-input"
                           type="text"
                           value={shareLink}
                           readOnly
                           className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm bg-gray-50"
+                          aria-label="Generated share link"
                         />
                         <button
                           onClick={copyToClipboard}
                           className="rounded-md bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                          aria-label="Copy share link to clipboard"
                         >
                           Copy
                         </button>
@@ -192,6 +204,7 @@ export default function ShareDialog({
                         onClick={handleLinkShare}
                         disabled={isLoading}
                         className="w-full rounded-md bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                        aria-label="Generate shareable link for PDF"
                       >
                         Generate Link
                       </button>
