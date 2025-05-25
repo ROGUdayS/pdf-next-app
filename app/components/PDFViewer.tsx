@@ -60,8 +60,31 @@ export default function PDFViewer({
   const [isSaving, setIsSaving] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(true);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [viewMode, setViewMode] = useState<"single" | "continuous">(
+    "continuous"
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Set mobile-friendly defaults
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768; // md breakpoint
+    if (isMobile) {
+      setFitMode("page");
+    }
+  }, []);
+
+  // Set view mode based on number of pages
+  useEffect(() => {
+    if (numPages !== null) {
+      if (numPages === 1) {
+        setViewMode("single");
+      } else {
+        setViewMode("continuous");
+      }
+    }
+  }, [numPages]);
 
   // Auto-hide keyboard help after 5 seconds
   useEffect(() => {
@@ -88,20 +111,40 @@ export default function PDFViewer({
         case "ArrowLeft":
         case "ArrowUp":
           event.preventDefault();
-          changePage(-1);
+          if (viewMode === "single") {
+            changePage(-1);
+          }
           break;
         case "ArrowRight":
         case "ArrowDown":
           event.preventDefault();
-          changePage(1);
+          if (viewMode === "single") {
+            changePage(1);
+          }
           break;
         case "Home":
           event.preventDefault();
-          setPageNumber(1);
+          if (viewMode === "single") {
+            setPageNumber(1);
+          } else {
+            // Scroll to top in continuous mode
+            const pdfViewer = document.querySelector(".pdf-viewer-content");
+            if (pdfViewer) {
+              pdfViewer.scrollTop = 0;
+            }
+          }
           break;
         case "End":
           event.preventDefault();
-          setPageNumber(numPages || 1);
+          if (viewMode === "single") {
+            setPageNumber(numPages || 1);
+          } else {
+            // Scroll to bottom in continuous mode
+            const pdfViewer = document.querySelector(".pdf-viewer-content");
+            if (pdfViewer) {
+              pdfViewer.scrollTop = pdfViewer.scrollHeight;
+            }
+          }
           break;
         case "Escape":
           event.preventDefault();
@@ -131,7 +174,7 @@ export default function PDFViewer({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [numPages, onClose]);
+  }, [numPages, onClose, viewMode]);
 
   // Capture the rendered page dimensions (already scaled & rotated)
   const handlePageLoadSuccess = ({
@@ -147,8 +190,9 @@ export default function PDFViewer({
   // Reset zoom/fit on window resize
   useEffect(() => {
     const onResize = () => {
+      const isMobile = window.innerWidth < 768;
       setScale(1.0);
-      setFitMode("width");
+      setFitMode(isMobile ? "page" : "width");
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -243,7 +287,8 @@ export default function PDFViewer({
     setError(null);
     setPageNumber(1);
     setScale(1.0);
-    setFitMode("width");
+    const isMobile = window.innerWidth < 768;
+    setFitMode(isMobile ? "page" : "width");
   }, [fileUrl]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -317,6 +362,27 @@ export default function PDFViewer({
     }
   };
 
+  // Render all pages for continuous view
+  const renderAllPages = () => {
+    if (!numPages) return null;
+
+    const pages = [];
+    for (let i = 1; i <= numPages; i++) {
+      pages.push(
+        <div key={`page_${i}`} className="mb-4">
+          <Page
+            pageNumber={i}
+            scale={scale}
+            rotate={rotation}
+            onLoadSuccess={handlePageLoadSuccess}
+            className="shadow-lg"
+          />
+        </div>
+      );
+    }
+    return pages;
+  };
+
   if (!pdfUrl) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -329,56 +395,473 @@ export default function PDFViewer({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={handleBackdropClick}
     >
       <div
         id="pdf-viewer-container"
         ref={containerRef}
-        className={`bg-background rounded-lg p-4 max-w-6xl w-full flex flex-col ${
-          isFullscreen ? "h-screen" : "max-h-[90vh]"
+        className={`bg-background rounded-lg p-2 sm:p-4 w-full flex flex-col ${
+          isFullscreen ? "h-screen max-w-none" : "max-h-[95vh] max-w-6xl"
         }`}
         tabIndex={0}
       >
-        {/* Toolbar */}
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-4 p-2 bg-card rounded-lg border border-border">
+        {/* Mobile Toolbar */}
+        <div className="md:hidden">
+          {/* Mobile Top Bar */}
+          <div className="flex justify-between items-center mb-2 p-2 bg-card rounded-lg border border-border">
+            <div className="flex items-center space-x-2">
+              {viewMode === "single" && (
+                <>
+                  <button
+                    onClick={() => changePage(-1)}
+                    disabled={pageNumber <= 1}
+                    className="p-2 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
+                    title="Previous page"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  <form
+                    onSubmit={handleJumpToPage}
+                    className="flex items-center space-x-1"
+                  >
+                    <input
+                      type="number"
+                      value={jumpToPage}
+                      onChange={(e) => setJumpToPage(e.target.value)}
+                      className="w-12 px-1 py-1 text-sm border border-border rounded-md bg-background text-foreground"
+                      placeholder={`${pageNumber}`}
+                      min={1}
+                      max={numPages || 1}
+                    />
+                    <span className="text-sm text-foreground">
+                      /{numPages || "?"}
+                    </span>
+                  </form>
+
+                  <button
+                    onClick={() => changePage(1)}
+                    disabled={pageNumber >= (numPages || 1)}
+                    className="p-2 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
+                    title="Next page"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </>
+              )}
+
+              {viewMode === "continuous" && (
+                <div className="text-sm text-foreground">
+                  Continuous View ({numPages || "?"} pages)
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2 hover:bg-secondary rounded-md text-foreground"
+                title="More options"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                  />
+                </svg>
+              </button>
+
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-secondary rounded-md text-foreground"
+                title="Close"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu Dropdown */}
+          {showMobileMenu && (
+            <div className="mb-2 p-3 bg-card rounded-lg border border-border space-y-3">
+              {/* View Mode Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">View:</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setViewMode("single")}
+                    className={`p-2 rounded-md ${
+                      viewMode === "single"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "hover:bg-secondary text-foreground"
+                    }`}
+                    title="Single page view"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setViewMode("continuous")}
+                    className={`p-2 rounded-md ${
+                      viewMode === "continuous"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "hover:bg-secondary text-foreground"
+                    }`}
+                    title="Continuous scroll view"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Zoom:</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => changeScale(-0.1)}
+                    className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                  >
+                    -
+                  </button>
+                  <span className="min-w-[50px] text-center text-sm text-foreground">
+                    {Math.round(scale * 100)}%
+                  </span>
+                  <button
+                    onClick={() => changeScale(0.1)}
+                    className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={toggleFit}
+                  className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                    />
+                  </svg>
+                  <span>{fitMode === "width" ? "Fit Page" : "Fit Width"}</span>
+                </button>
+
+                <button
+                  onClick={() => rotatePages(90)}
+                  className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span>Rotate</span>
+                </button>
+
+                {canDownload && (
+                  <button
+                    onClick={handleDownload}
+                    className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    <span>Download</span>
+                  </button>
+                )}
+
+                {canShare && onShare && (
+                  <button
+                    onClick={onShare}
+                    className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                      />
+                    </svg>
+                    <span>Share</span>
+                  </button>
+                )}
+
+                {isAuthenticated && onSaveToCollection && !isSaved && (
+                  <button
+                    onClick={handleSaveToCollection}
+                    disabled={isSaving}
+                    className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50 text-sm flex items-center justify-center space-x-2"
+                  >
+                    {isSaving ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <span>Save PDF</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {isAuthenticated && isSaved && (
+                  <div className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md flex items-center justify-center space-x-2 text-sm">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span>Saved</span>
+                  </div>
+                )}
+
+                {!isAuthenticated && onLogin && (
+                  <button
+                    onClick={onLogin}
+                    className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center space-x-2 text-sm col-span-2"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                      />
+                    </svg>
+                    <span>Log in</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Toolbar */}
+        <div className="hidden md:flex flex-wrap justify-between items-center gap-4 mb-4 p-2 bg-card rounded-lg border border-border">
           {/* Left */}
           <div className="flex items-center space-x-4">
-            <button
-              onClick={() => changePage(-1)}
-              disabled={pageNumber <= 1}
-              className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
-              title="Previous page (← or ↑)"
-            >
-              Previous
-            </button>
-            <form
-              onSubmit={handleJumpToPage}
-              className="flex items-center space-x-2"
-            >
-              <input
-                type="number"
-                value={jumpToPage}
-                onChange={(e) => setJumpToPage(e.target.value)}
-                className="w-16 px-2 py-1 border border-border rounded-md bg-background text-foreground"
-                placeholder={`${pageNumber}`}
-                min={1}
-                max={numPages || 1}
-              />
-              <span className="text-foreground">/ {numPages || "?"}</span>
-            </form>
-            <button
-              onClick={() => changePage(1)}
-              disabled={pageNumber >= (numPages || 1)}
-              className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
-              title="Next page (→ or ↓)"
-            >
-              Next
-            </button>
+            {viewMode === "single" ? (
+              <>
+                <button
+                  onClick={() => changePage(-1)}
+                  disabled={pageNumber <= 1}
+                  className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
+                  title="Previous page (← or ↑)"
+                >
+                  Previous
+                </button>
+                <form
+                  onSubmit={handleJumpToPage}
+                  className="flex items-center space-x-2"
+                >
+                  <input
+                    type="number"
+                    value={jumpToPage}
+                    onChange={(e) => setJumpToPage(e.target.value)}
+                    className="w-16 px-2 py-1 border border-border rounded-md bg-background text-foreground"
+                    placeholder={`${pageNumber}`}
+                    min={1}
+                    max={numPages || 1}
+                  />
+                  <span className="text-foreground">/ {numPages || "?"}</span>
+                </form>
+                <button
+                  onClick={() => changePage(1)}
+                  disabled={pageNumber >= (numPages || 1)}
+                  className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md disabled:opacity-50 hover:bg-secondary/80"
+                  title="Next page (→ or ↓)"
+                >
+                  Next
+                </button>
+              </>
+            ) : (
+              <div className="text-foreground">
+                Continuous View ({numPages || "?"} pages)
+              </div>
+            )}
           </div>
 
           {/* Center */}
           <div className="flex items-center space-x-4">
+            {/* View Mode Toggle */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setViewMode("single")}
+                className={`p-2 rounded-md ${
+                  viewMode === "single"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-secondary text-foreground"
+                }`}
+                title="Single page view"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode("continuous")}
+                className={`p-2 rounded-md ${
+                  viewMode === "continuous"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-secondary text-foreground"
+                }`}
+                title="Continuous scroll view"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-border" />
+
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => changeScale(-0.1)}
@@ -436,6 +919,7 @@ export default function PDFViewer({
                   : "hover:bg-secondary text-foreground"
               }`}
               title="Toggle side-by-side view"
+              disabled={viewMode === "continuous"}
             >
               <svg
                 className="w-5 h-5"
@@ -621,26 +1105,6 @@ export default function PDFViewer({
               </svg>
             </button>
 
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-secondary rounded-md text-foreground"
-              title="Close"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
             {isAuthenticated && (
               <button
                 onClick={() => setShowComments(!showComments)}
@@ -666,24 +1130,81 @@ export default function PDFViewer({
                 </svg>
               </button>
             )}
+
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-secondary rounded-md text-foreground"
+              title="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 
         {/* Keyboard shortcuts help text with fade out animation */}
         {showKeyboardHelp && (
-          <div className="text-xs text-muted-foreground mb-2 text-center transition-opacity duration-500 ease-in-out">
+          <div className="hidden md:block text-xs text-muted-foreground mb-2 text-center transition-opacity duration-500 ease-in-out">
             Use arrow keys to navigate pages • + / - to zoom • 0 to reset zoom •
             Esc to close
           </div>
         )}
 
+        {/* Mobile Floating Comments Button */}
+        {isAuthenticated && (
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className={`md:hidden fixed bottom-6 right-6 z-10 w-14 h-14 rounded-full shadow-lg flex items-center justify-center ${
+              showComments
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-card text-foreground hover:bg-card/90 border border-border"
+            }`}
+            title="Toggle Comments"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+              />
+            </svg>
+          </button>
+        )}
+
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div
+          className={`flex-1 overflow-hidden ${
+            showComments ? "flex flex-col md:flex-row" : "flex"
+          }`}
+        >
           {/* PDF Viewer */}
-          <div className={`flex-1 overflow-auto ${showComments ? "mr-4" : ""}`}>
+          <div
+            className={`flex-1 overflow-auto pdf-viewer-content ${
+              showComments ? "md:mr-4" : ""
+            }`}
+          >
             <div
               className={`flex justify-center ${
-                isSideBySide ? "space-x-4" : ""
+                isSideBySide && !showComments && viewMode === "single"
+                  ? "space-x-4"
+                  : ""
               }`}
             >
               <Document
@@ -710,31 +1231,47 @@ export default function PDFViewer({
                 }
                 options={options}
               >
-                <div className={`flex ${isSideBySide ? "space-x-4" : ""}`}>
-                  <Page
-                    key={`page_${pageNumber}_rot_${rotation}`}
-                    pageNumber={pageNumber}
-                    scale={scale}
-                    rotate={rotation}
-                    onLoadSuccess={handlePageLoadSuccess}
-                  />
-                  {isSideBySide && pageNumber < (numPages || 0) && (
+                {viewMode === "continuous" ? (
+                  <div className="space-y-4">{renderAllPages()}</div>
+                ) : (
+                  <div
+                    className={`flex ${
+                      isSideBySide && !showComments ? "space-x-4" : ""
+                    }`}
+                  >
                     <Page
-                      key={`page_${pageNumber + 1}_rot_${rotation}`}
-                      pageNumber={pageNumber + 1}
+                      key={`page_${pageNumber}_rot_${rotation}`}
+                      pageNumber={pageNumber}
                       scale={scale}
                       rotate={rotation}
                       onLoadSuccess={handlePageLoadSuccess}
                     />
-                  )}
-                </div>
+                    {isSideBySide &&
+                      pageNumber < (numPages || 0) &&
+                      !showComments && (
+                        <Page
+                          key={`page_${pageNumber + 1}_rot_${rotation}`}
+                          pageNumber={pageNumber + 1}
+                          scale={scale}
+                          rotate={rotation}
+                          onLoadSuccess={handlePageLoadSuccess}
+                        />
+                      )}
+                  </div>
+                )}
               </Document>
             </div>
           </div>
 
           {/* Comments Sidebar */}
           {showComments && (
-            <div className="w-80 flex-shrink-0 bg-card rounded-lg overflow-hidden border border-border">
+            <div
+              className={`${
+                showComments
+                  ? "w-full md:w-80 mt-4 md:mt-0 h-64 md:h-auto"
+                  : "w-80"
+              } flex-shrink-0 bg-card rounded-lg overflow-hidden border border-border`}
+            >
               <PDFComments
                 pdfId={pdfId}
                 isOwner={isOwner}
