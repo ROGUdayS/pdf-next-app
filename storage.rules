@@ -36,7 +36,7 @@ service firebase.storage {
         (
           // For PDF files
           (request.resource.contentType == 'application/pdf' &&
-           request.resource.size <= 10 * 1024 * 1024) ||
+           request.resource.size <= 100 * 1024 * 1024) ||
           // For thumbnails
           (request.resource.contentType.matches('image/.*') &&
            request.resource.size <= 2 * 1024 * 1024)
@@ -48,7 +48,7 @@ service firebase.storage {
         (
           // For PDF files
           (request.resource.contentType == 'application/pdf' &&
-           request.resource.size <= 10 * 1024 * 1024) ||
+           request.resource.size <= 100 * 1024 * 1024) ||
           // For thumbnails
           (request.resource.contentType.matches('image/.*') &&
            request.resource.size <= 2 * 1024 * 1024)

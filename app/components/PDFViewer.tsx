@@ -59,8 +59,79 @@ export default function PDFViewer({
   const [fitMode, setFitMode] = useState<"width" | "page">("width");
   const [isSaving, setIsSaving] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-hide keyboard help after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowKeyboardHelp(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't handle keyboard events if user is typing in an input field
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      switch (event.key) {
+        case "ArrowLeft":
+        case "ArrowUp":
+          event.preventDefault();
+          changePage(-1);
+          break;
+        case "ArrowRight":
+        case "ArrowDown":
+          event.preventDefault();
+          changePage(1);
+          break;
+        case "Home":
+          event.preventDefault();
+          setPageNumber(1);
+          break;
+        case "End":
+          event.preventDefault();
+          setPageNumber(numPages || 1);
+          break;
+        case "Escape":
+          event.preventDefault();
+          onClose();
+          break;
+        case "+":
+        case "=":
+          event.preventDefault();
+          changeScale(0.1);
+          break;
+        case "-":
+          event.preventDefault();
+          changeScale(-0.1);
+          break;
+        case "0":
+          event.preventDefault();
+          setScale(1.0);
+          setFitMode("width");
+          break;
+      }
+    };
+
+    // Add event listener when component mounts
+    document.addEventListener("keydown", handleKeyDown);
+
+    // Cleanup event listener when component unmounts
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [numPages, onClose]);
 
   // Capture the rendered page dimensions (already scaled & rotated)
   const handlePageLoadSuccess = ({
@@ -267,6 +338,7 @@ export default function PDFViewer({
         className={`bg-gray-200 rounded-lg p-4 max-w-6xl w-full flex flex-col ${
           isFullscreen ? "h-screen" : "max-h-[90vh]"
         }`}
+        tabIndex={0}
       >
         {/* Toolbar */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-4 p-2 bg-gray-100 rounded-lg">
@@ -276,6 +348,7 @@ export default function PDFViewer({
               onClick={() => changePage(-1)}
               disabled={pageNumber <= 1}
               className="px-3 py-1 bg-gray-200 rounded-md disabled:opacity-50 hover:bg-gray-300"
+              title="Previous page (← or ↑)"
             >
               Previous
             </button>
@@ -298,6 +371,7 @@ export default function PDFViewer({
               onClick={() => changePage(1)}
               disabled={pageNumber >= (numPages || 1)}
               className="px-3 py-1 bg-gray-200 rounded-md disabled:opacity-50 hover:bg-gray-300"
+              title="Next page (→ or ↓)"
             >
               Next
             </button>
@@ -309,7 +383,7 @@ export default function PDFViewer({
               <button
                 onClick={() => changeScale(-0.1)}
                 className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
-                title="Zoom out"
+                title="Zoom out (-)"
               >
                 -
               </button>
@@ -319,7 +393,7 @@ export default function PDFViewer({
               <button
                 onClick={() => changeScale(0.1)}
                 className="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300"
-                title="Zoom in"
+                title="Zoom in (+)"
               >
                 +
               </button>
@@ -594,6 +668,14 @@ export default function PDFViewer({
             )}
           </div>
         </div>
+
+        {/* Keyboard shortcuts help text with fade out animation */}
+        {showKeyboardHelp && (
+          <div className="text-xs text-gray-600 mb-2 text-center transition-opacity duration-500 ease-in-out">
+            Use arrow keys to navigate pages • + / - to zoom • 0 to reset zoom •
+            Esc to close
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 overflow-hidden flex">
