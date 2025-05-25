@@ -854,7 +854,7 @@ export default function PDFsPage() {
       {pdfs.map((pdf) => (
         <div
           key={pdf.id}
-          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
+          className="bg-white rounded-lg shadow-sm overflow-visible hover:shadow-md transition-shadow duration-200"
         >
           {/* Thumbnail and content section */}
           <div className="cursor-pointer" onClick={() => setSelectedPdf(pdf)}>
@@ -1076,7 +1076,7 @@ export default function PDFsPage() {
 
   // List view component
   const ListView = ({ pdfs }: { pdfs: PdfFile[] }) => (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+    <div className="bg-white shadow-sm rounded-lg overflow-visible">
       <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
         <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 uppercase tracking-wider">
           <div className="col-span-1"></div>
@@ -1403,7 +1403,7 @@ export default function PDFsPage() {
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-gray-900">My PDFs</h1>
-          <div className="relative">
+          <div className="flex items-center gap-4">
             <input
               type="file"
               accept=".pdf"
@@ -1414,13 +1414,24 @@ export default function PDFsPage() {
             />
             <label
               htmlFor="pdf-upload"
-              className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                isUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
+                isUploading ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
-              {isUploading
-                ? `Uploading ${uploadProgress.toFixed(0)}%`
-                : "Upload PDF"}
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              {isUploading ? "Uploading..." : "Upload PDF"}
             </label>
           </div>
         </div>

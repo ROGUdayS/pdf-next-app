@@ -21,8 +21,11 @@ export default function Home() {
     try {
       await signInWithGoogle();
       router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Failed to sign in with Google:", error.message);
+    } catch (error: unknown) {
+      console.error(
+        "Failed to sign in with Google:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
     }
   };
 
@@ -54,14 +57,15 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl lg:text-7xl">
-              <span className="block">Share Knowledge,</span>
+              <span className="block">Share PDFs,</span>
               <span className="block mt-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                Build Community
+                Collaborate Seamlessly
               </span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-2xl mx-auto">
-              Join our vibrant community of knowledge seekers. Share PDFs,
-              discover new content, and connect with like-minded individuals.
+              Upload, share, and collaborate on PDF documents with advanced
+              viewing, real-time commenting, and secure sharing controls.
+              Perfect for teams, students, and professionals.
             </p>
 
             {/* Auth Buttons */}
@@ -116,7 +120,7 @@ export default function Home() {
 
           {/* Features Grid */}
           <div className="mt-24 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature, index) => (
+            {features.map((feature) => (
               <div
                 key={feature.title}
                 className="relative group rounded-2xl border border-gray-200 bg-white p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
@@ -150,9 +154,9 @@ export default function Home() {
 
 const features = [
   {
-    title: "Easy Sharing",
+    title: "Secure PDF Sharing",
     description:
-      "Share PDFs securely with your community in just a few clicks. Control who can access your content.",
+      "Upload and share PDF documents with granular permission controls. Share via email or public links with customizable access levels.",
     icon: (
       <svg
         className="w-6 h-6"
@@ -170,9 +174,9 @@ const features = [
     ),
   },
   {
-    title: "Smart Organization",
+    title: "Advanced PDF Viewer",
     description:
-      "Organize your PDFs with tags, folders, and smart collections. Find what you need instantly.",
+      "View PDFs with zoom controls, page navigation, rotation, fullscreen mode, and side-by-side viewing. Optimized for all devices.",
     icon: (
       <svg
         className="w-6 h-6"
@@ -184,15 +188,21 @@ const features = [
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={2}
-          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
         />
       </svg>
     ),
   },
   {
-    title: "Community Engagement",
+    title: "Real-time Collaboration",
     description:
-      "Connect with others, discuss content, and build meaningful relationships through shared knowledge.",
+      "Add comments, reply to discussions, and collaborate in real-time. Rich text formatting with likes and threaded conversations.",
     icon: (
       <svg
         className="w-6 h-6"
