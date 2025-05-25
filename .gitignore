@@ -43,3 +43,5 @@ next-env.d.ts
 .cursor/
 node_modules/
 .firebase/
+
+auth-config.json
