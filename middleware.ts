@@ -12,15 +12,7 @@ export function middleware(request: NextRequest) {
   // Get the token from the session cookie
   const token = request.cookies.get("__firebase_auth_token");
 
-  // If the user is not authenticated and trying to access protected routes
-  if (!token && path.startsWith("/dashboard")) {
-    // Store the original URL to redirect back after authentication
-    const redirectUrl = new URL("/signin", request.url);
-    redirectUrl.searchParams.set("redirect", path);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  // If the user is authenticated and trying to access auth pages
+  // If the user is authenticated and trying to access auth pages, redirect to dashboard
   if (token && isAuthPage) {
     const redirectTo =
       request.nextUrl.searchParams.get("redirect") || "/dashboard";
@@ -28,10 +20,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If the user is authenticated and trying to access the home page
+  // If the user is authenticated and trying to access the home page, redirect to dashboard
   if (token && isPublicPage) {
     const redirectUrl = new URL("/dashboard", request.url);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // For dashboard routes without a token, let the client-side handle the redirect
+  // This prevents the middleware from being too aggressive and allows proper loading states
+  if (!token && path.startsWith("/dashboard")) {
+    // Only redirect if this is a direct navigation (not a client-side navigation)
+    const isDirectNavigation = !request.headers.get("x-middleware-prefetch");
+    if (isDirectNavigation) {
+      const redirectUrl = new URL("/signin", request.url);
+      redirectUrl.searchParams.set("redirect", path);
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   return NextResponse.next();
