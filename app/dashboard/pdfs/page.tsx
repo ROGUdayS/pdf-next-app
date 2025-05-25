@@ -25,11 +25,12 @@ import {
   orderBy,
   onSnapshot,
   setDoc,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import Image from "next/image";
 import PDFViewer from "@/app/components/PDFViewer";
 import ShareDialog from "@/app/components/ShareDialog";
-import { FirebaseError } from "firebase/app";
 
 interface PdfFile {
   id: string;
@@ -52,6 +53,10 @@ interface PdfFile {
 const thumbnailCache = new Map<string, string>();
 const processedPdfs = new Set<string>();
 
+type ViewMode = "grid" | "list";
+type SortOption = "name" | "date" | "size";
+type SortDirection = "asc" | "desc";
+
 export default function PDFsPage() {
   const { user } = useAuth();
   const [pdfs, setPdfs] = useState<Map<string, PdfFile>>(new Map());
@@ -61,13 +66,20 @@ export default function PDFsPage() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [deletingPdfId, setDeletingPdfId] = useState<string | null>(null);
   const [renamingPdfId, setRenamingPdfId] = useState<string | null>(null);
-  const [editingPdf, setEditingPdf] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [selectedPdf, setSelectedPdf] = useState<PdfFile | null>(null);
   const [sharingPdf, setSharingPdf] = useState<PdfFile | null>(null);
 
+  // New state for view options, search, and sorting
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
   // Function to process a PDF and generate its thumbnail
-  const processPdf = async (doc: any): Promise<PdfFile> => {
+  const processPdf = async (
+    doc: QueryDocumentSnapshot<DocumentData>
+  ): Promise<PdfFile> => {
     const data = doc.data();
 
     // If we already have the thumbnailUrl from Firestore, use that directly
@@ -240,12 +252,40 @@ export default function PDFsPage() {
     };
   }, [user]);
 
-  // Convert Map to sorted array for rendering
-  const sortedPdfs = useMemo(() => {
-    return Array.from(pdfs.values()).sort(
-      (a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()
-    );
-  }, [pdfs]);
+  // Enhanced sorted and filtered PDFs with search and sorting
+  const filteredAndSortedPdfs = useMemo(() => {
+    let filtered = Array.from(pdfs.values());
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter((pdf) =>
+        pdf.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "date":
+          comparison = a.uploadedAt.getTime() - b.uploadedAt.getTime();
+          break;
+        case "size":
+          comparison = a.size - b.size;
+          break;
+        default:
+          comparison = b.uploadedAt.getTime() - a.uploadedAt.getTime();
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [pdfs, searchTerm, sortBy, sortDirection]);
 
   // Modified handleFileUpload to store storage path
   const handleFileUpload = async (
@@ -319,18 +359,23 @@ export default function PDFsPage() {
               accessUsers: [user.email as string],
               ownerId: user.uid,
               thumbnailUrl: null,
+              allowSave: true,
             });
 
             setError(null);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("Error in upload completion:", error);
-            setError(`Failed to save PDF: ${error.message}`);
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error";
+            setError(`Failed to save PDF: ${errorMessage}`);
           }
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload process failed:", error);
-      setError(`Upload failed: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      setError(`Upload failed: ${errorMessage}`);
       setIsUploading(false);
       setUploadProgress(0);
     }
@@ -385,9 +430,11 @@ export default function PDFsPage() {
 
       setError("PDF deleted successfully");
       setTimeout(() => setError(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting PDF:", error);
-      setError(`Failed to delete PDF: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      setError(`Failed to delete PDF: ${errorMessage}`);
     } finally {
       setDeletingPdfId(null);
     }
@@ -513,9 +560,9 @@ export default function PDFsPage() {
           } catch (error) {
             console.error("Storage operation failed:", {
               error,
-              phase: error.phase || "unknown",
-              code: error.code || "unknown",
-              message: error.message || "unknown",
+              phase: "unknown",
+              code: "unknown",
+              message: error instanceof Error ? error.message : "unknown",
             });
             throw error;
           }
@@ -538,7 +585,9 @@ export default function PDFsPage() {
         oldName: pdf.name,
         newName: newName.trim(),
       });
-      setError(`Failed to rename PDF: ${error.message || "Unknown error"}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      setError(`Failed to rename PDF: ${errorMessage}`);
 
       // Restore the original PDF in case of error
       setPdfs((current) => {
@@ -551,7 +600,6 @@ export default function PDFsPage() {
 
   // Cancel rename function with cleanup
   const handleCancelRename = () => {
-    setEditingPdf(null);
     setNewName("");
     setError(null);
   };
@@ -572,12 +620,6 @@ export default function PDFsPage() {
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
-  };
-
-  // Add this helper function at the top of your component
-  const showFallback = (element: HTMLElement) => {
-    element.style.display = "none";
-    element.parentElement?.classList.add("pdf-fallback");
   };
 
   // Add this function at the top level of your component, alongside other functions like handleDelete
@@ -667,7 +709,7 @@ export default function PDFsPage() {
           return newMap;
         });
       }
-    } catch (error: Error | FirebaseError | unknown) {
+    } catch (error: Error | unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to share PDF";
       throw new Error("Failed to share PDF: " + errorMessage);
@@ -699,8 +741,10 @@ export default function PDFsPage() {
 
       // Return the shareable link
       return `${window.location.origin}/shared/${sharingPdf.id}`;
-    } catch (error: any) {
-      throw new Error("Failed to generate share link: " + error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new Error("Failed to generate share link: " + errorMessage);
     }
   };
 
@@ -802,6 +846,453 @@ export default function PDFsPage() {
       setError("Failed to save PDF to your collection");
     }
   };
+
+  // Grid view component
+  const GridView = ({ pdfs }: { pdfs: PdfFile[] }) => (
+    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {pdfs.map((pdf) => (
+        <div
+          key={pdf.id}
+          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
+        >
+          {/* Thumbnail and content section */}
+          <div className="cursor-pointer" onClick={() => setSelectedPdf(pdf)}>
+            {pdf.thumbnailUrl ? (
+              <div className="pdf-thumbnail-container">
+                <div className="pdf-thumbnail-wrapper">
+                  <Image
+                    src={pdf.thumbnailUrl}
+                    alt={`${pdf.name} thumbnail`}
+                    width={400}
+                    height={300}
+                    className="pdf-thumbnail"
+                    loading="lazy"
+                    priority={false}
+                    onError={(e) => {
+                      console.error("Failed to load thumbnail:", {
+                        name: pdf.name,
+                        url: pdf.thumbnailUrl,
+                      });
+                      const container = (e.target as HTMLElement).parentElement
+                        ?.parentElement;
+                      if (container) {
+                        container.innerHTML = "";
+                        container.className = "pdf-fallback";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="pdf-fallback">
+                <svg
+                  className="w-12 h-12 text-gray-400 mb-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <span className="text-sm text-gray-400">PDF Preview</span>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1 min-w-0 pr-4">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  {pdf.name}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {pdf.uploadedBy === user?.email
+                    ? "Owned by you"
+                    : `Shared by ${pdf.uploadedBy}`}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {new Date(pdf.uploadedAt).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Actions menu */}
+              <div className="relative flex-shrink-0">
+                <Menu as="div" className="relative inline-block text-left">
+                  <Menu.Button className="p-2 hover:bg-gray-100 rounded-full">
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                      />
+                    </svg>
+                  </Menu.Button>
+
+                  <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="py-1">
+                      {/* Share option only for owned PDFs */}
+                      {pdf.uploadedBy === user?.email && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSharingPdf(pdf);
+                              }}
+                              className={`${
+                                active ? "bg-gray-100" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <svg
+                                className="mr-3 h-5 w-5 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                                />
+                              </svg>
+                              Share
+                            </button>
+                          )}
+                        </Menu.Item>
+                      )}
+
+                      {/* Rename option for all PDFs */}
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingPdfId(pdf.id);
+                              setNewName(pdf.name);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
+                            </svg>
+                            Rename
+                          </button>
+                        )}
+                      </Menu.Item>
+
+                      {/* Download option for all PDFs */}
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(pdf);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              />
+                            </svg>
+                            Download
+                          </button>
+                        )}
+                      </Menu.Item>
+
+                      {/* Delete option for all PDFs */}
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingPdfId(pdf.id);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700 text-red-600`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-red-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                            Delete
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </Menu.Items>
+                </Menu>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // List view component
+  const ListView = ({ pdfs }: { pdfs: PdfFile[] }) => (
+    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 uppercase tracking-wider">
+          <div className="col-span-1"></div>
+          <div className="col-span-4">Name</div>
+          <div className="col-span-2">Size</div>
+          <div className="col-span-2">Uploaded By</div>
+          <div className="col-span-2">Date</div>
+          <div className="col-span-1"></div>
+        </div>
+      </div>
+      <div className="divide-y divide-gray-200">
+        {pdfs.map((pdf) => (
+          <div
+            key={pdf.id}
+            className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            onClick={() => setSelectedPdf(pdf)}
+          >
+            <div className="grid grid-cols-12 gap-4 items-center">
+              <div className="col-span-1">
+                {pdf.thumbnailUrl ? (
+                  <Image
+                    src={pdf.thumbnailUrl}
+                    alt={`${pdf.name} thumbnail`}
+                    width={40}
+                    height={30}
+                    className="rounded object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-8 bg-gray-100 rounded flex items-center justify-center">
+                    <svg
+                      className="w-5 h-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="col-span-4">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {pdf.name}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-500">
+                  {formatFileSize(pdf.size)}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-500">
+                  {pdf.uploadedBy === user?.email ? "You" : pdf.uploadedBy}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-500">
+                  {formatDate(pdf.uploadedAt)}
+                </p>
+              </div>
+              <div className="col-span-1">
+                <Menu as="div" className="relative inline-block text-left">
+                  <Menu.Button
+                    className="p-2 hover:bg-gray-200 rounded-full"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                      />
+                    </svg>
+                  </Menu.Button>
+
+                  <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="py-1">
+                      {/* Same menu items as grid view */}
+                      {pdf.uploadedBy === user?.email && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSharingPdf(pdf);
+                              }}
+                              className={`${
+                                active ? "bg-gray-100" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <svg
+                                className="mr-3 h-5 w-5 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                                />
+                              </svg>
+                              Share
+                            </button>
+                          )}
+                        </Menu.Item>
+                      )}
+
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingPdfId(pdf.id);
+                              setNewName(pdf.name);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
+                            </svg>
+                            Rename
+                          </button>
+                        )}
+                      </Menu.Item>
+
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(pdf);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              />
+                            </svg>
+                            Download
+                          </button>
+                        )}
+                      </Menu.Item>
+
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingPdfId(pdf.id);
+                            }}
+                            className={`${
+                              active ? "bg-gray-100" : ""
+                            } flex w-full items-center px-4 py-2 text-sm text-gray-700 text-red-600`}
+                          >
+                            <svg
+                              className="mr-3 h-5 w-5 text-red-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                            Delete
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </Menu.Items>
+                </Menu>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -907,27 +1398,134 @@ export default function PDFsPage() {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">My PDFs</h1>
-        <div className="relative">
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="pdf-upload"
-            disabled={isUploading}
-          />
-          <label
-            htmlFor="pdf-upload"
-            className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-              isUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            {isUploading
-              ? `Uploading ${uploadProgress.toFixed(0)}%`
-              : "Upload PDF"}
-          </label>
+      {/* Header with search, view toggle, and upload */}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">My PDFs</h1>
+          <div className="relative">
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="pdf-upload"
+              disabled={isUploading}
+            />
+            <label
+              htmlFor="pdf-upload"
+              className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                isUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              }`}
+            >
+              {isUploading
+                ? `Uploading ${uploadProgress.toFixed(0)}%`
+                : "Upload PDF"}
+            </label>
+          </div>
+        </div>
+
+        {/* Search and controls */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          {/* Search bar */}
+          <div className="relative flex-1 max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg
+                className="h-5 w-5 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Search PDFs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Sort dropdown */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Sort by:</label>
+              <select
+                value={`${sortBy}-${sortDirection}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortDirection] = e.target.value.split(
+                    "-"
+                  ) as [SortOption, SortDirection];
+                  setSortBy(newSortBy);
+                  setSortDirection(newSortDirection);
+                }}
+                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="date-desc">Newest first</option>
+                <option value="date-asc">Oldest first</option>
+                <option value="name-asc">Name A-Z</option>
+                <option value="name-desc">Name Z-A</option>
+                <option value="size-desc">Largest first</option>
+                <option value="size-asc">Smallest first</option>
+              </select>
+            </div>
+
+            {/* View toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="Grid view"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === "list"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="List view"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -961,238 +1559,19 @@ export default function PDFsPage() {
         </div>
       )}
 
-      {/* PDF Grid */}
+      {/* PDF Grid or List */}
       {!isInitialLoading && (
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {sortedPdfs.map((pdf) => (
-            <div
-              key={pdf.id}
-              className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
-            >
-              {/* Thumbnail and content section */}
-              <div
-                className="cursor-pointer"
-                onClick={() => setSelectedPdf(pdf)}
-              >
-                {pdf.thumbnailUrl ? (
-                  <div className="pdf-thumbnail-container">
-                    <div className="pdf-thumbnail-wrapper">
-                      <Image
-                        src={pdf.thumbnailUrl}
-                        alt={`${pdf.name} thumbnail`}
-                        width={400}
-                        height={300}
-                        className="pdf-thumbnail"
-                        loading="lazy"
-                        priority={false}
-                        onError={(e) => {
-                          console.error("Failed to load thumbnail:", {
-                            name: pdf.name,
-                            url: pdf.thumbnailUrl,
-                          });
-                          const container = (e.target as HTMLElement)
-                            .parentElement?.parentElement;
-                          if (container) {
-                            container.innerHTML = "";
-                            container.className = "pdf-fallback";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pdf-fallback">
-                    <svg
-                      className="w-12 h-12 text-gray-400 mb-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span className="text-sm text-gray-400">PDF Preview</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
-                      {pdf.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {pdf.uploadedBy === user?.email
-                        ? "Owned by you"
-                        : `Shared by ${pdf.uploadedBy}`}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(pdf.uploadedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-
-                  {/* Show actions menu for both owned and saved PDFs */}
-                  <div className="relative flex-shrink-0">
-                    <Menu as="div" className="relative inline-block text-left">
-                      <Menu.Button className="p-2 hover:bg-gray-100 rounded-full">
-                        <svg
-                          className="w-5 h-5 text-gray-500"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                          />
-                        </svg>
-                      </Menu.Button>
-
-                      <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        <div className="py-1">
-                          {/* Share option only for owned PDFs */}
-                          {pdf.uploadedBy === user?.email && (
-                            <Menu.Item>
-                              {({ active }) => (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSharingPdf(pdf);
-                                  }}
-                                  className={`${
-                                    active ? "bg-gray-100" : ""
-                                  } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                                >
-                                  <svg
-                                    className="mr-3 h-5 w-5 text-gray-400"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                                    />
-                                  </svg>
-                                  Share
-                                </button>
-                              )}
-                            </Menu.Item>
-                          )}
-
-                          {/* Rename option for all PDFs */}
-                          <Menu.Item>
-                            {({ active }) => (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRenamingPdfId(pdf.id);
-                                  setNewName(pdf.name);
-                                  setEditingPdf(null); // Reset any existing edit mode
-                                }}
-                                className={`${
-                                  active ? "bg-gray-100" : ""
-                                } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                              >
-                                <svg
-                                  className="mr-3 h-5 w-5 text-gray-400"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                                  />
-                                </svg>
-                                Rename
-                              </button>
-                            )}
-                          </Menu.Item>
-
-                          {/* Download option for all PDFs */}
-                          <Menu.Item>
-                            {({ active }) => (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownload(pdf);
-                                }}
-                                className={`${
-                                  active ? "bg-gray-100" : ""
-                                } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                              >
-                                <svg
-                                  className="mr-3 h-5 w-5 text-gray-400"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                  />
-                                </svg>
-                                Download
-                              </button>
-                            )}
-                          </Menu.Item>
-
-                          {/* Delete option for all PDFs */}
-                          <Menu.Item>
-                            {({ active }) => (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingPdfId(pdf.id);
-                                }}
-                                className={`${
-                                  active ? "bg-gray-100" : ""
-                                } flex w-full items-center px-4 py-2 text-sm text-gray-700 text-red-600`}
-                              >
-                                <svg
-                                  className="mr-3 h-5 w-5 text-red-400"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                                Delete
-                              </button>
-                            )}
-                          </Menu.Item>
-                        </div>
-                      </Menu.Items>
-                    </Menu>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          {viewMode === "grid" ? (
+            <GridView pdfs={filteredAndSortedPdfs} />
+          ) : (
+            <ListView pdfs={filteredAndSortedPdfs} />
+          )}
+        </>
       )}
 
       {/* Empty state */}
-      {!isInitialLoading && sortedPdfs.length === 0 && !error && (
+      {!isInitialLoading && filteredAndSortedPdfs.length === 0 && !error && (
         <div className="text-center py-12">
           <svg
             className="mx-auto h-12 w-12 text-gray-400"
@@ -1207,9 +1586,13 @@ export default function PDFsPage() {
               d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No PDFs</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            {searchTerm ? "No PDFs found" : "No PDFs"}
+          </h3>
           <p className="mt-1 text-sm text-gray-500">
-            Upload your first PDF to get started
+            {searchTerm
+              ? `No PDFs match "${searchTerm}"`
+              : "Upload your first PDF to get started"}
           </p>
         </div>
       )}
