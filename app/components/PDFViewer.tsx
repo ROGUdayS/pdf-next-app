@@ -7,6 +7,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "../lib/pdfjs-config";
 import PDFComments from "./PDFComments";
+import { getBaseUrl } from "@/lib/utils";
 
 interface PDFViewerProps {
   fileUrl: string;
@@ -160,7 +161,7 @@ export default function PDFViewer({
       return fileUrl;
     }
     if (!authToken) return null;
-    const u = new URL("/api/pdf-proxy", window.location.origin);
+    const u = new URL("/api/pdf-proxy", getBaseUrl());
     u.searchParams.set("url", fileUrl);
     u.searchParams.set("token", authToken);
     return u.toString();
