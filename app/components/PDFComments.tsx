@@ -126,6 +126,9 @@ export default function PDFComments({
   const [replyText, setReplyText] = useState("");
   const [isReplyBoldActive, setIsReplyBoldActive] = useState(false);
   const [isReplyItalicActive, setIsReplyItalicActive] = useState(false);
+  const [showFormattingTools, setShowFormattingTools] = useState(false);
+  const [showReplyFormattingTools, setShowReplyFormattingTools] =
+    useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const replyEditorRef = useRef<HTMLDivElement>(null);
   const auth = getAuth();
@@ -232,6 +235,7 @@ export default function PDFComments({
       await addDoc(collection(db, "pdf_comments"), commentData);
       setNewComment("");
       if (editorRef.current) editorRef.current.innerHTML = "";
+      setShowFormattingTools(false);
     } catch (err) {
       console.error(err);
     }
@@ -261,6 +265,7 @@ export default function PDFComments({
 
       setReplyText("");
       setReplyingTo(null);
+      setShowReplyFormattingTools(false);
       if (replyEditorRef.current) replyEditorRef.current.innerHTML = "";
     } catch (err) {
       console.error(err);
@@ -326,8 +331,10 @@ export default function PDFComments({
   return (
     <div className="h-full flex flex-col bg-card rounded-lg shadow-lg border border-border">
       {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">Comments</h2>
+      <div className="p-3 md:p-4 border-b border-border flex items-center justify-between">
+        <h2 className="text-base md:text-lg font-semibold text-foreground">
+          Comments
+        </h2>
         {isOwner && (
           <button
             onClick={clearAllComments}
@@ -335,7 +342,7 @@ export default function PDFComments({
             title="Clear all comments"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4 md:w-5 md:h-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -352,35 +359,38 @@ export default function PDFComments({
       </div>
 
       {/* Comments List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {comments.map((c) => (
-          <div key={c.id} className="bg-secondary/50 rounded-lg p-3 space-y-2">
-            <div className="flex items-start space-x-3">
+          <div
+            key={c.id}
+            className="bg-secondary/50 rounded-lg p-2 md:p-3 space-y-2"
+          >
+            <div className="flex items-start space-x-2 md:space-x-3">
               <UserAvatar url={c.userAvatar} name={c.userName} />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-foreground text-sm md:text-base truncate">
                     {c.userName}
                   </span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs md:text-sm text-muted-foreground flex-shrink-0 ml-2">
                     {format(c.timestamp, "MMM d, yyyy h:mm a")}
                   </span>
                 </div>
                 <div
-                  className="mt-2 text-foreground"
+                  className="mt-1 md:mt-2 text-foreground text-sm md:text-base"
                   dangerouslySetInnerHTML={{ __html: c.formattedText }}
                 />
-                <div className="mt-2 flex items-center space-x-4">
+                <div className="mt-2 flex items-center space-x-3 md:space-x-4">
                   <button
                     onClick={() => toggleLike(c.id)}
-                    className={`text-sm flex items-center space-x-1 ${
+                    className={`text-xs md:text-sm flex items-center space-x-1 ${
                       c.likes.includes(auth.currentUser?.uid || "")
                         ? "text-primary"
                         : "text-muted-foreground hover:text-primary"
                     }`}
                   >
                     <svg
-                      className="w-4 h-4"
+                      className="w-3 h-3 md:w-4 md:h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -400,7 +410,7 @@ export default function PDFComments({
                   </button>
                   <button
                     onClick={() => setReplyingTo(c.id)}
-                    className="text-sm text-muted-foreground hover:text-primary"
+                    className="text-xs md:text-sm text-muted-foreground hover:text-primary"
                   >
                     Reply
                   </button>
@@ -410,24 +420,24 @@ export default function PDFComments({
 
             {/* Replies */}
             {c.replies.length > 0 && (
-              <div className="ml-8 mt-2 space-y-2">
+              <div className="ml-6 md:ml-8 mt-2 space-y-2">
                 {c.replies.map((reply) => (
                   <div
                     key={reply.id}
-                    className="flex items-start space-x-3 bg-card rounded-lg p-2 border border-border"
+                    className="flex items-start space-x-2 md:space-x-3 bg-card rounded-lg p-2 border border-border"
                   >
                     <UserAvatar url={reply.userAvatar} name={reply.userName} />
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
-                        <span className="font-medium text-foreground">
+                        <span className="font-medium text-foreground text-sm truncate">
                           {reply.userName}
                         </span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
                           {format(reply.timestamp, "MMM d, yyyy h:mm a")}
                         </span>
                       </div>
                       <div
-                        className="mt-1 text-foreground"
+                        className="mt-1 text-foreground text-sm"
                         dangerouslySetInnerHTML={{ __html: reply.text }}
                       />
                     </div>
@@ -438,29 +448,46 @@ export default function PDFComments({
 
             {/* Reply Input */}
             {replyingTo === c.id && (
-              <div className="ml-8 mt-2">
-                <div className="flex space-x-2 mb-2">
+              <div className="ml-6 md:ml-8 mt-2">
+                {/* Mobile Formatting Toggle */}
+                <div className="md:hidden mb-2">
+                  <button
+                    onClick={() =>
+                      setShowReplyFormattingTools(!showReplyFormattingTools)
+                    }
+                    className="text-xs text-muted-foreground hover:text-primary"
+                  >
+                    {showReplyFormattingTools ? "Hide" : "Show"} formatting
+                  </button>
+                </div>
+
+                {/* Formatting Tools */}
+                <div
+                  className={`${
+                    showReplyFormattingTools ? "flex" : "hidden md:flex"
+                  } space-x-2 mb-2`}
+                >
                   <button
                     onClick={() => toggleBold(true)}
-                    className={`p-2 rounded hover:bg-secondary ${
+                    className={`p-1 md:p-2 rounded hover:bg-secondary ${
                       isReplyBoldActive ? "bg-secondary" : ""
-                    } text-foreground`}
+                    } text-foreground text-sm`}
                     title="Bold"
                   >
                     <strong>B</strong>
                   </button>
                   <button
                     onClick={() => toggleItalic(true)}
-                    className={`p-2 rounded hover:bg-secondary ${
+                    className={`p-1 md:p-2 rounded hover:bg-secondary ${
                       isReplyItalicActive ? "bg-secondary" : ""
-                    } text-foreground`}
+                    } text-foreground text-sm`}
                     title="Italic"
                   >
                     <em>I</em>
                   </button>
                   <button
                     onClick={() => insertBulletPrefix(true)}
-                    className="p-2 rounded hover:bg-secondary text-foreground"
+                    className="p-1 md:p-2 rounded hover:bg-secondary text-foreground text-sm"
                     title="Insert Bullet Prefix"
                   >
                     •
@@ -471,16 +498,16 @@ export default function PDFComments({
                     ref={replyEditorRef}
                     contentEditable
                     onInput={(e) => handleInput(e, true)}
-                    className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[3rem] bg-background text-foreground"
+                    className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[2.5rem] md:min-h-[3rem] bg-background text-foreground text-sm md:text-base"
                   />
                   <button
                     onClick={() => addReply(c.id)}
-                    className="flex items-center justify-center w-10 h-10 bg-primary rounded-full hover:bg-primary/90"
+                    className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-primary rounded-full hover:bg-primary/90"
                     title="Send Reply"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-primary-foreground"
+                      className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -501,29 +528,44 @@ export default function PDFComments({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex space-x-2 mb-2">
+      <div className="p-3 md:p-4 border-t border-border">
+        {/* Mobile Formatting Toggle */}
+        <div className="md:hidden mb-2">
+          <button
+            onClick={() => setShowFormattingTools(!showFormattingTools)}
+            className="text-xs text-muted-foreground hover:text-primary"
+          >
+            {showFormattingTools ? "Hide" : "Show"} formatting
+          </button>
+        </div>
+
+        {/* Formatting Tools */}
+        <div
+          className={`${
+            showFormattingTools ? "flex" : "hidden md:flex"
+          } space-x-2 mb-2`}
+        >
           <button
             onClick={() => toggleBold(false)}
-            className={`p-2 rounded hover:bg-secondary ${
+            className={`p-1 md:p-2 rounded hover:bg-secondary ${
               isBoldActive ? "bg-secondary" : ""
-            } text-foreground`}
+            } text-foreground text-sm`}
             title="Bold"
           >
             <strong>B</strong>
           </button>
           <button
             onClick={() => toggleItalic(false)}
-            className={`p-2 rounded hover:bg-secondary ${
+            className={`p-1 md:p-2 rounded hover:bg-secondary ${
               isItalicActive ? "bg-secondary" : ""
-            } text-foreground`}
+            } text-foreground text-sm`}
             title="Italic"
           >
             <em>I</em>
           </button>
           <button
             onClick={() => insertBulletPrefix(false)}
-            className="p-2 rounded hover:bg-secondary text-foreground"
+            className="p-1 md:p-2 rounded hover:bg-secondary text-foreground text-sm"
             title="Insert Bullet Prefix"
           >
             •
@@ -534,16 +576,16 @@ export default function PDFComments({
             ref={editorRef}
             contentEditable
             onInput={(e) => handleInput(e, false)}
-            className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[3rem] bg-background text-foreground"
+            className="flex-1 p-2 border border-border rounded-lg outline-none min-h-[2.5rem] md:min-h-[3rem] bg-background text-foreground text-sm md:text-base"
           />
           <button
             onClick={addComment}
-            className="flex items-center justify-center w-10 h-10 bg-primary rounded-full hover:bg-primary/90"
+            className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-primary rounded-full hover:bg-primary/90"
             title="Send Comment"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 text-primary-foreground"
+              className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
