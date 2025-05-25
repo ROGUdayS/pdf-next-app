@@ -4,7 +4,12 @@ import {
   FirebaseOptions,
   FirebaseApp,
 } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
+import {
+  getAuth,
+  Auth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import {
   getFirestore,
   FirestoreError,
@@ -74,6 +79,14 @@ let analytics: Analytics | null = null;
 
 try {
   auth = getAuth(app);
+
+  // Set authentication persistence to local storage
+  if (typeof window !== "undefined") {
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.warn("Error setting auth persistence:", error);
+    });
+  }
+
   console.log("Firebase Auth initialized successfully");
 } catch (error) {
   console.error("Error initializing Firebase Auth:", error);

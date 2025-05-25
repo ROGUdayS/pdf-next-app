@@ -57,34 +57,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Set a minimum loading time to ensure Firebase has time to restore auth state
+    const minLoadingTime = setTimeout(() => {
+      // This will be cleared if auth state is determined earlier
+    }, 1000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      // Clear the minimum loading timeout since we have auth state
+      clearTimeout(minLoadingTime);
+
       setUser(user);
+
       if (!user) {
         setPdfStats({
           ownedCount: 0,
           sharedCount: 0,
           recentPdfs: [],
         });
+        // Remove the token cookie
+        document.cookie =
+          "__firebase_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+
         setLoading(false);
+
+        // If on a protected page, redirect to signin
+        if (window.location.pathname.startsWith("/dashboard")) {
+          router.push("/signin");
+        }
         return;
       }
 
-      // Get the ID token
-      const token = await user.getIdToken();
+      try {
+        // Get the ID token
+        const token = await user.getIdToken();
 
-      // Store the token in a cookie with proper settings
-      document.cookie = `__firebase_auth_token=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
+        // Store the token in a cookie with proper settings
+        document.cookie = `__firebase_auth_token=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
 
-      // If on an auth page, redirect to dashboard
-      if (
-        window.location.pathname === "/signin" ||
-        window.location.pathname === "/signup"
-      ) {
-        router.push("/dashboard");
+        // If on an auth page, redirect to dashboard
+        if (
+          window.location.pathname === "/signin" ||
+          window.location.pathname === "/signup"
+        ) {
+          router.push("/dashboard");
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error getting ID token:", error);
+        setLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      clearTimeout(minLoadingTime);
+    };
   }, [router]);
 
   useEffect(() => {
@@ -155,18 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Error in recent PDFs query:", error);
         }
       );
-
-      setLoading(false);
     } else {
       console.log("No user authenticated");
-      // Remove the token cookie
-      document.cookie =
-        "__firebase_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-
-      // If on a protected page, redirect to signin
-      if (window.location.pathname.startsWith("/dashboard")) {
-        router.push("/signin");
-      }
     }
 
     return () => {
@@ -174,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (unsubscribeShared) unsubscribeShared();
       if (unsubscribeRecent) unsubscribeRecent();
     };
-  }, [user, router]);
+  }, [user]);
 
   const signUp = async (email: string, password: string) => {
     try {
@@ -184,16 +202,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password
       );
       return userCredential;
-    } catch (error: any) {
-      throw new Error(error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      throw new Error(errorMessage);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      throw new Error(error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      throw new Error(errorMessage);
     }
   };
 
@@ -201,8 +223,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      throw new Error(error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      throw new Error(errorMessage);
     }
   };
 
@@ -210,8 +234,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await firebaseSignOut(auth);
       router.push("/");
-    } catch (error: any) {
-      throw new Error(error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      throw new Error(errorMessage);
     }
   };
 
