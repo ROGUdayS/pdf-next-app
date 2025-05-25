@@ -3,7 +3,7 @@
   command = "./scripts/netlify-build.sh"
 
 [build.environment]
-  NODE_VERSION = "20.11.0"
+  NODE_VERSION = "20"
   CANVAS_PREBUILT = "false"
   PYTHON = "/opt/buildhome/.local/share/mise/installs/python/3.13.3/bin/python3"
 
