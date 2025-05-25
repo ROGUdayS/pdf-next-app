@@ -310,8 +310,8 @@ export default function PDFsPage() {
       setIsUploading(false);
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File size should be less than 10MB");
+    if (file.size > 100 * 1024 * 1024) {
+      setError("File size should be less than 100MB");
       setIsUploading(false);
       return;
     }

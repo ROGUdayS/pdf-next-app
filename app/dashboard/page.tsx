@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { storage, db } from "@/lib/firebase";
 import { Menu } from "@headlessui/react";
@@ -44,11 +44,15 @@ export default function Dashboard() {
   const [recentPdfs, setRecentPdfs] = useState<PdfFile[]>([]);
   const [ownedPdfs, setOwnedPdfs] = useState<PdfFile[]>([]);
   const [sharedPdfs, setSharedPdfs] = useState<PdfFile[]>([]);
+  const [allPdfs, setAllPdfs] = useState<PdfFile[]>([]);
   const [selectedPdf, setSelectedPdf] = useState<PdfFile | null>(null);
   const [sharingPdf, setSharingPdf] = useState<PdfFile | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("en-US", {
@@ -67,7 +71,6 @@ export default function Dashboard() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Process PDF and generate thumbnail
   const processPdf = async (
     doc: QueryDocumentSnapshot<DocumentData>
   ): Promise<PdfFile> => {
@@ -89,7 +92,6 @@ export default function Dashboard() {
     };
   };
 
-  // Fetch recent PDFs
   useEffect(() => {
     if (!user) return;
 
@@ -110,7 +112,6 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
-  // Fetch owned PDFs (limited)
   useEffect(() => {
     if (!user) return;
 
@@ -131,7 +132,6 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
-  // Fetch shared PDFs (limited)
   useEffect(() => {
     if (!user) return;
 
@@ -154,7 +154,45 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
-  // Handle file upload
+  useEffect(() => {
+    if (!user) return;
+
+    const allPdfsQuery = query(
+      collection(db, "pdfs"),
+      where("accessUsers", "array-contains", user.email),
+      orderBy("uploadedAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(allPdfsQuery, async (snapshot) => {
+      const pdfs = await Promise.all(
+        snapshot.docs.map((doc) => processPdf(doc))
+      );
+      setAllPdfs(pdfs);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const searchResults = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+
+    return allPdfs.filter((pdf) =>
+      pdf.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [allPdfs, searchTerm]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setShowSearchResults(value.trim().length > 0);
+  };
+
+  const handleSearchResultClick = (pdf: PdfFile) => {
+    setSelectedPdf(pdf);
+    setSearchTerm("");
+    setShowSearchResults(false);
+  };
+
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -171,8 +209,8 @@ export default function Dashboard() {
       setIsUploading(false);
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File size should be less than 10MB");
+    if (file.size > 100 * 1024 * 1024) {
+      setError("File size should be less than 100MB");
       setIsUploading(false);
       return;
     }
@@ -276,13 +314,93 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header with Upload */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">
             Manage and collaborate on your PDF documents
           </p>
+        </div>
+
+        <div className="relative flex-1 max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg
+              className="h-5 w-5 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search PDFs..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+
+          {showSearchResults && (
+            <div className="absolute z-50 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-auto">
+              {searchResults.length > 0 ? (
+                <div className="py-1">
+                  {searchResults.map((pdf) => (
+                    <button
+                      key={pdf.id}
+                      onClick={() => handleSearchResultClick(pdf)}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-3"
+                    >
+                      {pdf.thumbnailUrl ? (
+                        <Image
+                          src={pdf.thumbnailUrl}
+                          alt={`${pdf.name} thumbnail`}
+                          width={32}
+                          height={24}
+                          className="rounded object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-6 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                          <svg
+                            className="w-4 h-4 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {pdf.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {pdf.isOwned
+                            ? "Owned by you"
+                            : `Shared by ${pdf.uploadedBy}`}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-2 text-sm text-gray-500">
+                  No PDFs found matching "{searchTerm}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -318,7 +436,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Upload Progress */}
+      {showSearchResults && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowSearchResults(false)}
+        />
+      )}
+
       {isUploading && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
@@ -338,7 +462,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Error/Success Message */}
       {error && (
         <div
           className={`rounded-lg p-4 ${
@@ -351,7 +474,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
           href="/dashboard/pdfs"
@@ -450,7 +572,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent PDFs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -602,9 +723,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Quick Access Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* My PDFs Preview */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -673,7 +792,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Shared PDFs Preview */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -745,7 +863,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* PDF Viewer Modal */}
       {selectedPdf && (
         <PDFViewer
           fileUrl={selectedPdf.url}
@@ -761,18 +878,15 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Share Dialog */}
       {sharingPdf && (
         <ShareDialog
           isOpen={!!sharingPdf}
           pdfName={sharingPdf.name}
           onClose={() => setSharingPdf(null)}
           onShareViaEmail={async (email: string, allowSave: boolean) => {
-            // Handle email sharing logic here
             console.log("Share via email:", email, allowSave);
           }}
           onShareViaLink={async (allowSave: boolean) => {
-            // Handle link sharing logic here
             console.log("Share via link:", allowSave);
             return "https://example.com/shared/link";
           }}
