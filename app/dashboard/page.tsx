@@ -641,7 +641,7 @@ export default function Dashboard() {
                             />
                           </svg>
                         </Menu.Button>
-                        <Menu.Items className="absolute right-0 z-10 mt-1 w-32 origin-top-right rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
+                        <Menu.Items className="absolute right-0 z-10 mt-1 w-32 origin-top-right rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none overflow-visible z-50">
                           <div className="py-1">
                             {pdf.isOwned && (
                               <Menu.Item>
