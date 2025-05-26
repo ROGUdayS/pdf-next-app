@@ -1247,6 +1247,7 @@ export default function PDFViewer({
               }`}
             >
               <Document
+                key={pdfUrl}
                 file={pdfUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
                 onLoadError={onDocumentLoadError}
