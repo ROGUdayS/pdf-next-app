@@ -18,7 +18,6 @@ interface ShareDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onShareViaEmail: (email: string, allowSave: boolean) => Promise<void>;
-  onShareViaLink: (allowSave: boolean) => Promise<string>;
   pdfName: string;
   pdfId: string;
 }
@@ -34,7 +33,6 @@ export default function ShareDialog({
   isOpen,
   onClose,
   onShareViaEmail,
-  onShareViaLink,
   pdfName,
   pdfId,
 }: ShareDialogProps) {
@@ -43,7 +41,11 @@ export default function ShareDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [allowSave, setAllowSave] = useState(false);
+
+  // Separate permission states for email and link sharing
+  const [emailAllowSave, setEmailAllowSave] = useState(false);
+  const [linkAllowSave, setLinkAllowSave] = useState(false);
+
   const [accessUsers, setAccessUsers] = useState<AccessUser[]>([]);
   const [isPubliclyShared, setIsPubliclyShared] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -57,6 +59,20 @@ export default function ShareDialog({
       loadAccessUsers();
     }
   }, [isOpen, pdfId]);
+
+  // Refresh data when dialog closes
+  const handleClose = () => {
+    loadAccessUsers(); // Refresh data before closing
+    onClose();
+  };
+
+  // Generate a random share ID for the link
+  const generateRandomShareId = () => {
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
+  };
 
   const checkForSavedCopies = async () => {
     try {
@@ -163,10 +179,14 @@ export default function ShareDialog({
 
         setAccessUsers(usersWithSavedInfo);
         setIsPubliclyShared(data.isPubliclyShared || false);
-        setAllowSave(data.allowSave || false);
+        setEmailAllowSave(false); // Always start with view-only for email
+        setLinkAllowSave(data.linkAllowSave || false); // Use separate linkAllowSave field
 
         if (data.isPubliclyShared) {
-          setShareLink(`${window.location.origin}/shared/${pdfId}`);
+          const shareId = data.shareId || pdfId; // Fallback to pdfId for old links
+          setShareLink(`${window.location.origin}/shared/${shareId}`);
+        } else {
+          setShareLink("");
         }
       }
     } catch (error) {
@@ -186,8 +206,12 @@ export default function ShareDialog({
     setSuccess(null);
 
     try {
-      await onShareViaEmail(email, allowSave);
-      setSuccess(`Successfully shared "${pdfName}" with ${email}`);
+      await onShareViaEmail(email, emailAllowSave);
+      setSuccess(
+        `Successfully shared "${pdfName}" with ${email} (${
+          emailAllowSave ? "Can Save" : "View Only"
+        })`
+      );
       setEmail("");
       // Reload access users to show the new user
       await loadAccessUsers();
@@ -298,22 +322,27 @@ export default function ShareDialog({
 
       const pdfRef = doc(db, "pdfs", pdfId);
       const newPublicState = !isPubliclyShared;
+      const newShareId = newPublicState ? generateRandomShareId() : null;
 
       await updateDoc(pdfRef, {
         isPubliclyShared: newPublicState,
-        allowSave: allowSave,
+        linkAllowSave: linkAllowSave, // Use separate field for link permissions
+        shareId: newShareId,
       });
 
       setIsPubliclyShared(newPublicState);
 
-      if (newPublicState) {
-        const link = `${window.location.origin}/shared/${pdfId}`;
+      if (newPublicState && newShareId) {
+        const link = `${window.location.origin}/shared/${newShareId}`;
         setShareLink(link);
-        setSuccess("PDF is now publicly accessible via link");
+        setSuccess("PDF is now publicly accessible via new link");
       } else {
         setShareLink("");
         setSuccess("Public link access disabled");
       }
+
+      // Refresh data to show updated settings
+      await loadAccessUsers();
     } catch (error) {
       console.error("Error toggling public sharing:", error);
       setError("Failed to update sharing settings");
@@ -322,20 +351,48 @@ export default function ShareDialog({
     }
   };
 
-  const handleUpdateGlobalPermissions = async () => {
+  const handleLinkPermissionChange = async (newAllowSave: boolean) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const pdfRef = doc(db, "pdfs", pdfId);
-      await updateDoc(pdfRef, {
-        allowSave: allowSave,
-      });
+      setLinkAllowSave(newAllowSave);
 
-      setSuccess("Global permissions updated successfully");
+      if (isPubliclyShared) {
+        // Generate new link when permissions change
+        const newShareId = generateRandomShareId();
+        const pdfRef = doc(db, "pdfs", pdfId);
+
+        await updateDoc(pdfRef, {
+          linkAllowSave: newAllowSave,
+          shareId: newShareId,
+        });
+
+        const newLink = `${window.location.origin}/shared/${newShareId}`;
+        setShareLink(newLink);
+        setSuccess(
+          `Link permissions updated - new link generated (${
+            newAllowSave ? "Can Save" : "View Only"
+          })`
+        );
+
+        // Refresh data
+        await loadAccessUsers();
+      } else {
+        // Just update the permission for future use
+        const pdfRef = doc(db, "pdfs", pdfId);
+        await updateDoc(pdfRef, {
+          linkAllowSave: newAllowSave,
+        });
+        setSuccess(
+          `Link permissions updated (${
+            newAllowSave ? "Can Save" : "View Only"
+          })`
+        );
+      }
     } catch (error) {
-      console.error("Error updating permissions:", error);
-      setError("Failed to update permissions");
+      console.error("Error updating link permissions:", error);
+      setError("Failed to update link permissions");
     } finally {
       setIsLoading(false);
     }
@@ -352,7 +409,7 @@ export default function ShareDialog({
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -428,52 +485,41 @@ export default function ShareDialog({
                 {/* Share Tab */}
                 {activeTab === "share" && (
                   <div className="space-y-6">
-                    {/* Global Permission Settings */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                        Default Permissions for New Shares
-                      </h4>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <label className="text-sm text-gray-700 dark:text-gray-300">
-                            Allow Save & Download
-                          </label>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            New users will be able to save and download this PDF
-                          </p>
-                        </div>
-                        <Switch
-                          checked={allowSave}
-                          onChange={setAllowSave}
-                          className={`${
-                            allowSave
-                              ? "bg-blue-600 dark:bg-blue-500"
-                              : "bg-gray-200 dark:bg-gray-600"
-                          } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800`}
-                        >
-                          <span
-                            className={`${
-                              allowSave ? "translate-x-6" : "translate-x-1"
-                            } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-                          />
-                        </Switch>
-                      </div>
-                      {(isPubliclyShared || accessUsers.length > 0) && (
-                        <button
-                          onClick={handleUpdateGlobalPermissions}
-                          disabled={isLoading}
-                          className="mt-3 px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          Update Default Permissions
-                        </button>
-                      )}
-                    </div>
-
                     {/* Share via Email */}
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                         Share via Email
                       </h4>
+
+                      {/* Email Permission Toggle */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <label className="text-sm text-gray-700 dark:text-gray-300">
+                            Email Permission
+                          </label>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {emailAllowSave
+                              ? "User can save & download"
+                              : "View only access"}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={emailAllowSave}
+                          onChange={setEmailAllowSave}
+                          className={`${
+                            emailAllowSave
+                              ? "bg-green-600 dark:bg-green-500"
+                              : "bg-gray-200 dark:bg-gray-600"
+                          } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800`}
+                        >
+                          <span
+                            className={`${
+                              emailAllowSave ? "translate-x-6" : "translate-x-1"
+                            } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                          />
+                        </Switch>
+                      </div>
+
                       <form onSubmit={handleEmailShare}>
                         <div className="flex gap-2">
                           <input
@@ -494,69 +540,108 @@ export default function ShareDialog({
                         </div>
                       </form>
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        User will receive an email with access permissions set
-                        above
+                        User will receive an email with{" "}
+                        {emailAllowSave ? "save & download" : "view only"}{" "}
+                        permissions
                       </p>
                     </div>
 
                     {/* Share via Link */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                        Share via Link
-                      </h4>
                       <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <label className="text-sm text-gray-700 dark:text-gray-300">
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                          Share via Link
+                        </h4>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             Enable Public Link
-                          </label>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Anyone with the link can access this PDF
-                          </p>
-                        </div>
-                        <Switch
-                          checked={isPubliclyShared}
-                          onChange={handleTogglePublicSharing}
-                          disabled={isLoading}
-                          className={`${
-                            isPubliclyShared
-                              ? "bg-blue-600 dark:bg-blue-500"
-                              : "bg-gray-200 dark:bg-gray-600"
-                          } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50`}
-                        >
-                          <span
+                          </span>
+                          <Switch
+                            checked={isPubliclyShared}
+                            onChange={handleTogglePublicSharing}
+                            disabled={isLoading}
                             className={`${
                               isPubliclyShared
-                                ? "translate-x-6"
-                                : "translate-x-1"
-                            } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-                          />
-                        </Switch>
+                                ? "bg-blue-600 dark:bg-blue-500"
+                                : "bg-gray-200 dark:bg-gray-600"
+                            } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50`}
+                          >
+                            <span
+                              className={`${
+                                isPubliclyShared
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                            />
+                          </Switch>
+                        </div>
                       </div>
 
-                      {isPubliclyShared && shareLink && (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={shareLink}
-                            readOnly
-                            className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
-                          />
-                          <button
-                            onClick={copyToClipboard}
-                            className="rounded-md bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
-                          >
-                            Copy
-                          </button>
+                      {isPubliclyShared && (
+                        <div className="space-y-3">
+                          {/* Link Permission Toggle */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-sm text-gray-700 dark:text-gray-300">
+                                Link Permission
+                              </label>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {linkAllowSave
+                                  ? "Users can save & download"
+                                  : "View only access"}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={linkAllowSave}
+                              onChange={handleLinkPermissionChange}
+                              disabled={isLoading}
+                              className={`${
+                                linkAllowSave
+                                  ? "bg-green-600 dark:bg-green-500"
+                                  : "bg-gray-200 dark:bg-gray-600"
+                              } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50`}
+                            >
+                              <span
+                                className={`${
+                                  linkAllowSave
+                                    ? "translate-x-6"
+                                    : "translate-x-1"
+                                } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                              />
+                            </Switch>
+                          </div>
+
+                          {/* Share Link Display */}
+                          {shareLink && (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={shareLink}
+                                readOnly
+                                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                              />
+                              <button
+                                onClick={copyToClipboard}
+                                className="rounded-md bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Public link users will have{" "}
+                            {linkAllowSave ? "save & download" : "view only"}{" "}
+                            permissions
+                          </p>
                         </div>
                       )}
 
-                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {isPubliclyShared
-                          ? `Public link users will have ${
-                              allowSave ? "save & download" : "view only"
-                            } permissions`
-                          : "Enable to create a shareable link"}
-                      </p>
+                      {!isPubliclyShared && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Enable public link to share this PDF with anyone
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -673,7 +758,7 @@ export default function ShareDialog({
                             <p className="text-sm text-yellow-800 dark:text-yellow-200">
                               <strong>Public Link Active:</strong> Anyone with
                               the link can access this PDF with{" "}
-                              {allowSave ? "save & download" : "view only"}{" "}
+                              {linkAllowSave ? "save & download" : "view only"}{" "}
                               permissions. Users shown above have individual
                               permission settings.
                             </p>
@@ -686,7 +771,7 @@ export default function ShareDialog({
 
                 <div className="mt-6 flex justify-end space-x-3">
                   <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   >
                     Close

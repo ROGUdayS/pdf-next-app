@@ -38,6 +38,7 @@ interface SharedPdfData {
   ownerId: string;
   storagePath: string;
   allowSave: boolean;
+  linkAllowSave?: boolean;
 }
 
 export default function SharedPDFPage() {
@@ -65,7 +66,7 @@ export default function SharedPDFPage() {
         // Query user's PDFs collection to check if this PDF is already saved
         const q = query(
           collection(db, "pdfs"),
-          where("originalId", "==", params.id),
+          where("originalId", "==", pdfData.id),
           where("savedBy", "==", user.uid)
         );
         const querySnapshot = await getDocs(q);
@@ -94,8 +95,8 @@ export default function SharedPDFPage() {
 
   // Handle renaming saved PDF
   const handleRename = async () => {
-    if (!savedPdfId || !newName.trim() || !user) return;
-    const pdfId = params.id?.toString();
+    if (!savedPdfId || !newName.trim() || !user || !pdfData) return;
+    const pdfId = pdfData.id;
     if (!pdfId) return;
 
     try {
@@ -271,7 +272,7 @@ export default function SharedPDFPage() {
   // Handle saving PDF to user's collection
   const handleSaveToCollection = async () => {
     if (!user || !pdfData || isSaving) return;
-    const pdfId = params.id?.toString();
+    const pdfId = pdfData.id;
     if (!pdfId) return;
 
     try {
@@ -281,7 +282,7 @@ export default function SharedPDFPage() {
       // Check if already saved
       const savedQuery = query(
         collection(db, "pdfs"),
-        where("originalPdfId", "==", pdfId),
+        where("originalId", "==", pdfId),
         where("savedBy", "==", user.uid)
       );
       const savedSnapshot = await getDocs(savedQuery);
@@ -352,7 +353,7 @@ export default function SharedPDFPage() {
         uploadedBy: pdfData.uploadedBy,
         uploadedAt: new Date(),
         savedBy: user.uid,
-        originalPdfId: pdfId,
+        originalId: pdfId,
         isPubliclyShared: false,
         accessUsers: [user.email],
         thumbnailUrl: thumbnailUrl,
@@ -384,9 +385,34 @@ export default function SharedPDFPage() {
         setIsLoading(true);
         setError(null);
 
-        // Get the PDF document
-        const pdfDoc = doc(db, "pdfs", params.id.toString());
-        const pdfSnapshot = await getDoc(pdfDoc);
+        let pdfSnapshot;
+        let actualPdfId = params.id.toString();
+
+        // First, try to get the PDF document directly (for backward compatibility with old links)
+        const directPdfDoc = doc(db, "pdfs", params.id.toString());
+        const directSnapshot = await getDoc(directPdfDoc);
+
+        if (directSnapshot.exists()) {
+          // Direct PDF ID found (old format)
+          pdfSnapshot = directSnapshot;
+        } else {
+          // Not found directly, search by shareId (new format)
+          const q = query(
+            collection(db, "pdfs"),
+            where("shareId", "==", params.id.toString())
+          );
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            // Found PDF by shareId
+            pdfSnapshot = querySnapshot.docs[0];
+            actualPdfId = pdfSnapshot.id;
+          } else {
+            setError("PDF not found or link has expired");
+            setIsLoading(false);
+            return;
+          }
+        }
 
         if (!pdfSnapshot.exists()) {
           setError("PDF not found");
@@ -418,17 +444,42 @@ export default function SharedPDFPage() {
           : null;
 
         const hasExplicitAccess = !!userAccess;
-        const canSave =
-          userAccess && typeof userAccess === "object"
-            ? userAccess.canSave
-            : data.allowSave;
         const isPubliclyShared = data.isPubliclyShared === true;
+
+        // Determine save permissions based on access type:
+        // Use the HIGHEST permission level available to the user
+        // 1. Owner always can save
+        // 2. Compare explicit access vs public link access and use the higher permission
+        let canSave = false;
+        if (isOwner) {
+          canSave = true;
+        } else {
+          // Get explicit permission (if user has explicit access)
+          let explicitCanSave = false;
+          if (hasExplicitAccess && typeof userAccess === "object") {
+            explicitCanSave = userAccess.canSave;
+          } else if (hasExplicitAccess && typeof userAccess === "string") {
+            // Old format - assume they had the old allowSave permission
+            explicitCanSave = data.allowSave || false;
+          }
+
+          // Get public link permission (if PDF is publicly shared)
+          const linkCanSave = isPubliclyShared
+            ? data.linkAllowSave || false
+            : false;
+
+          // Use the highest permission available
+          canSave = explicitCanSave || linkCanSave;
+        }
 
         // Update user permission state
         setUserCanSave(canSave);
 
         // Check access permissions
-        if (!isPubliclyShared && !isOwner && !hasExplicitAccess) {
+        // Allow access if: owner OR has explicit access OR PDF is publicly shared
+        const hasAccess = isOwner || hasExplicitAccess || isPubliclyShared;
+
+        if (!hasAccess) {
           setError(
             "This PDF is not publicly shared and you don't have access to it"
           );
@@ -447,21 +498,26 @@ export default function SharedPDFPage() {
           }
         );
 
+        // Only add user to access list if they're accessing via public link
+        // (not if they already have explicit access or are the owner)
         if (
           user?.email &&
           !isUserInAccessList &&
-          data.ownerId !== user.uid &&
-          (isPubliclyShared || hasExplicitAccess)
+          !isOwner &&
+          isPubliclyShared &&
+          !hasExplicitAccess
         ) {
           try {
-            // Add user in the new object format
+            // Add user in the new object format with link permissions
             const newUserAccess = {
               email: user.email,
-              canSave: data.allowSave || false,
+              canSave: data.linkAllowSave || false, // Use link permission for public access
               addedAt: new Date(),
             };
 
-            await updateDoc(pdfDoc, {
+            // Use the actual PDF document reference
+            const pdfDocRef = doc(db, "pdfs", actualPdfId);
+            await updateDoc(pdfDocRef, {
               accessUsers: [...data.accessUsers, newUserAccess],
             });
             console.log("Added user to shared list:", user.email);
@@ -474,7 +530,7 @@ export default function SharedPDFPage() {
         }
 
         setPdfData({
-          id: pdfSnapshot.id,
+          id: actualPdfId, // Use the actual PDF ID for consistency
           name: data.name || "Untitled",
           url: data.url,
           uploadedBy: data.uploadedBy || "Unknown",
@@ -486,6 +542,7 @@ export default function SharedPDFPage() {
           ownerId: data.ownerId,
           storagePath: data.storagePath,
           allowSave: data.allowSave || false,
+          linkAllowSave: data.linkAllowSave || false,
         });
       } catch (err) {
         console.error("Error fetching PDF:", err);
@@ -554,14 +611,15 @@ export default function SharedPDFPage() {
                   >
                     Log in
                   </Link>
-                  {pdfData.allowSave && " to save and download this PDF"}
+                  {(pdfData.linkAllowSave || pdfData.allowSave) &&
+                    " to save and download this PDF"}
                 </div>
               )}
 
               {user && !userCanSave && (
                 <div className="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md inline-block">
-                  🔒 View only - Saving and downloading not allowed for your
-                  access level
+                  🔒 View only - Neither your access level nor the public link
+                  allows saving
                 </div>
               )}
 
