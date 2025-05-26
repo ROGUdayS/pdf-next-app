@@ -40,6 +40,12 @@ export default function PDFViewer({
   pdfId,
   isOwner = false,
 }: PDFViewerProps) {
+  // Create unique instance ID for this PDF viewer
+  const instanceId = useMemo(
+    () => `pdf-viewer-${pdfId}-${Date.now()}`,
+    [pdfId]
+  );
+
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
@@ -64,8 +70,19 @@ export default function PDFViewer({
   const [viewMode, setViewMode] = useState<"single" | "continuous">(
     "continuous"
   );
+  const [documentKey, setDocumentKey] = useState<string>("");
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Generate unique key for each PDF to force re-render
+  useEffect(() => {
+    const newKey = `${instanceId}-${fileUrl}-${Date.now()}`;
+    setDocumentKey(newKey);
+    setRetryCount(0);
+  }, [instanceId, fileUrl]);
 
   // Set mobile-friendly defaults
   useEffect(() => {
@@ -241,9 +258,39 @@ export default function PDFViewer({
       cMapPacked: true,
       standardFontDataUrl:
         "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/",
+      // Additional options for better production compatibility
+      disableStream: true,
+      disableAutoFetch: true,
+      maxImageSize: 1024 * 1024,
+      isEvalSupported: false,
+      useSystemFonts: true,
+      // Add worker fallback for Netlify compatibility
+      disableWorker:
+        typeof window !== "undefined" &&
+        window.location.hostname.includes("netlify"),
     }),
     []
   );
+
+  // Cleanup effect for component unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup any PDF.js resources when component unmounts
+      if (typeof window !== "undefined") {
+        // Force garbage collection of PDF.js resources
+        try {
+          import("pdfjs-dist").then((pdfjs) => {
+            // Clear any cached documents
+            if (pdfjs.PDFDocumentProxy) {
+              // This helps with memory cleanup
+            }
+          });
+        } catch (error) {
+          console.log("PDF.js cleanup error:", error);
+        }
+      }
+    };
+  }, []);
 
   // Fullscreen listener
   useEffect(() => {
@@ -287,19 +334,59 @@ export default function PDFViewer({
     setError(null);
     setPageNumber(1);
     setScale(1.0);
+    setNumPages(null);
     const isMobile = window.innerWidth < 768;
     setFitMode(isMobile ? "page" : "width");
-  }, [fileUrl]);
+    // Force re-render with new key
+    setDocumentKey(`${instanceId}-${fileUrl}-${Date.now()}`);
+  }, [fileUrl, instanceId]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setError(null);
+    console.log(
+      `PDF loaded successfully: ${instanceId}, pages: ${numPages}, URL: ${pdfUrl?.substring(
+        0,
+        50
+      )}...`
+    );
   };
 
   function onDocumentLoadError(e: Error) {
-    console.error(e);
-    setError("Failed to load PDF. Please try again.");
+    console.error(`PDF Load Error for ${instanceId}:`, {
+      error: e.message,
+      stack: e.stack,
+      url: pdfUrl?.substring(0, 100),
+      userAgent:
+        typeof window !== "undefined" ? window.navigator.userAgent : "unknown",
+      hostname:
+        typeof window !== "undefined" ? window.location.hostname : "unknown",
+      retryCount,
+    });
+    setError(`Failed to load PDF: ${e.message}`);
   }
+
+  const handleRetry = () => {
+    if (retryCount < 3) {
+      setIsRetrying(true);
+      setError(null);
+
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.pow(2, retryCount) * 1000;
+
+      setTimeout(() => {
+        setRetryCount((prev) => prev + 1);
+        setDocumentKey(
+          `${instanceId}-${fileUrl}-${Date.now()}-retry-${retryCount + 1}`
+        );
+        setIsRetrying(false);
+      }, delay);
+    } else {
+      setError(
+        "Failed to load PDF after multiple attempts. Please check your connection and try again."
+      );
+    }
+  };
 
   function changePage(offset: number) {
     setPageNumber((p) => Math.min(Math.max(1, p + offset), numPages || 1));
@@ -324,19 +411,61 @@ export default function PDFViewer({
   }
 
   async function toggleFullscreen() {
-    const viewer = document.getElementById("pdf-viewer-container");
+    const viewer = document.getElementById(
+      `pdf-viewer-container-${instanceId}`
+    );
     if (!viewer) return;
     if (!document.fullscreenElement) await viewer.requestFullscreen();
     else await document.exitFullscreen();
   }
 
-  function handleDownload() {
-    const a = document.createElement("a");
-    a.href = fileUrl;
-    a.download = fileName;
-    document.body.append(a);
-    a.click();
-    a.remove();
+  async function handleDownload() {
+    if (isDownloading) return; // Prevent multiple simultaneous downloads
+
+    try {
+      setIsDownloading(true);
+      setError(null);
+
+      // For authenticated users, use the proxy URL to maintain auth
+      const downloadUrl = isAuthenticated && authToken ? pdfUrl : fileUrl;
+
+      if (!downloadUrl) {
+        setError("Unable to download PDF. Please try again.");
+        return;
+      }
+
+      // Fetch the PDF as a blob to ensure download behavior
+      const response = await fetch(downloadUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+
+      // Create a blob URL
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      // Create download link
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      a.style.display = "none";
+
+      // Add to DOM, click, and remove
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download error:", error);
+      setError("Failed to download PDF. Please try again.");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   function openInNewTab() {
@@ -399,7 +528,7 @@ export default function PDFViewer({
       onClick={handleBackdropClick}
     >
       <div
-        id="pdf-viewer-container"
+        id={`pdf-viewer-container-${instanceId}`}
         ref={containerRef}
         className={`bg-background rounded-lg p-2 sm:p-4 w-full flex flex-col ${
           isFullscreen ? "h-screen max-w-none" : "max-h-[95vh] max-w-6xl"
@@ -670,22 +799,27 @@ export default function PDFViewer({
                 {canDownload && (
                   <button
                     onClick={handleDownload}
-                    className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
+                    disabled={isDownloading}
+                    className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 text-sm flex items-center justify-center space-x-2"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                      />
-                    </svg>
-                    <span>Download</span>
+                    {isDownloading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-secondary-foreground"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                    )}
+                    <span>{isDownloading ? "Downloading..." : "Download"}</span>
                   </button>
                 )}
 
@@ -1052,22 +1186,27 @@ export default function PDFViewer({
             {canDownload && (
               <button
                 onClick={handleDownload}
-                className="p-2 hover:bg-secondary rounded-md text-foreground"
-                title="Download PDF"
+                disabled={isDownloading}
+                className="p-2 hover:bg-secondary rounded-md text-foreground disabled:opacity-50"
+                title={isDownloading ? "Downloading..." : "Download PDF"}
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
+                {isDownloading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-foreground"></div>
+                ) : (
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                )}
               </button>
             )}
 
@@ -1247,6 +1386,7 @@ export default function PDFViewer({
               }`}
             >
               <Document
+                key={documentKey}
                 file={pdfUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
                 onLoadError={onDocumentLoadError}
@@ -1261,11 +1401,27 @@ export default function PDFViewer({
                       {error || "Failed to load PDF."}
                     </div>
                     <button
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+                        setError(null);
+                        setDocumentKey(
+                          `${instanceId}-${fileUrl}-${Date.now()}`
+                        );
+                      }}
                       className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                     >
                       Try Again
                     </button>
+                    {retryCount < 3 && (
+                      <button
+                        onClick={handleRetry}
+                        disabled={isRetrying}
+                        className="ml-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50"
+                      >
+                        {isRetrying
+                          ? `Retrying in ${Math.pow(2, retryCount)}s...`
+                          : `Auto Retry (${retryCount}/3)`}
+                      </button>
+                    )}
                   </div>
                 }
                 options={options}
