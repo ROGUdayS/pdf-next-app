@@ -40,9 +40,12 @@ export default function PDFViewer({
   pdfId,
   isOwner = false,
 }: PDFViewerProps) {
-  // Create unique instance ID for this PDF viewer
+  // Create unique instance ID for this PDF viewer with more entropy
   const instanceId = useMemo(
-    () => `pdf-viewer-${pdfId}-${Date.now()}`,
+    () =>
+      `pdf-viewer-${pdfId}-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`,
     [pdfId]
   );
 
@@ -77,9 +80,11 @@ export default function PDFViewer({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Generate unique key for each PDF to force re-render
+  // Generate unique key for each PDF to force re-render with more isolation
   useEffect(() => {
-    const newKey = `${instanceId}-${fileUrl}-${Date.now()}`;
+    const newKey = `${instanceId}-${fileUrl}-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
     // Add delay to ensure proper cleanup between PDF switches
     const loadNewPdf = () => {
@@ -89,7 +94,10 @@ export default function PDFViewer({
 
     // If this is a PDF switch (not initial load), add delay for cleanup
     if (documentKey) {
-      setTimeout(loadNewPdf, 100);
+      // Force cleanup of previous document
+      setNumPages(null);
+      setError(null);
+      setTimeout(loadNewPdf, 200); // Increased delay for better cleanup
     } else {
       loadNewPdf();
     }
@@ -262,7 +270,7 @@ export default function PDFViewer({
     }
   }
 
-  // PDF.js options
+  // PDF.js options with enhanced isolation
   const options = useMemo(
     () => ({
       cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
@@ -281,50 +289,31 @@ export default function PDFViewer({
         (window.location.hostname.includes("netlify") ||
           window.location.hostname.includes("vercel") ||
           process.env.NODE_ENV === "production"),
-      // Force new document context
+      // Force new document context with unique cache key
       verbosity: 0,
       // Disable caching to prevent conflicts
       disableRange: true,
       // Use legacy build for better compatibility
       useOnlyCssZoom: true,
+      // Add unique cache key to prevent document sharing
+      cacheKey: `${instanceId}-${documentKey}-${Date.now()}`,
     }),
-    []
+    [instanceId, documentKey]
   );
 
-  // Cleanup effect for component unmount with more aggressive cleanup
+  // Enhanced cleanup effect for component unmount
   useEffect(() => {
     return () => {
       // Cleanup any PDF.js resources when component unmounts
       if (typeof window !== "undefined") {
         // Force garbage collection of PDF.js resources
         try {
-          import("pdfjs-dist").then((pdfjs) => {
-            // Clear any cached documents and workers
-            if (pdfjs.PDFWorker) {
-              // Destroy any existing workers
-              try {
-                pdfjs.PDFWorker.getWorkerSrc = () => null;
-              } catch (e) {
-                console.log("Worker cleanup:", e);
-              }
+          // Clear any cached resources
+          setTimeout(() => {
+            if (typeof (window as any).gc === "function") {
+              (window as any).gc();
             }
-
-            // Force cleanup of document cache
-            if (typeof pdfjs.getDocument === "function") {
-              // Clear internal caches
-              try {
-                // This helps clear any cached documents
-                const cleanup = () => {
-                  if (window.gc) {
-                    window.gc();
-                  }
-                };
-                setTimeout(cleanup, 100);
-              } catch (e) {
-                console.log("Cache cleanup:", e);
-              }
-            }
-          });
+          }, 100);
         } catch (error) {
           console.log("PDF.js cleanup error:", error);
         }
@@ -332,22 +321,17 @@ export default function PDFViewer({
     };
   }, []);
 
-  // Add document cleanup when switching PDFs
+  // Enhanced document cleanup when switching PDFs
   useEffect(() => {
     // Clear any existing PDF.js state when switching documents
     if (typeof window !== "undefined" && documentKey) {
       try {
-        import("pdfjs-dist").then((pdfjs) => {
-          // Force cleanup before loading new document
-          if (pdfjs.PDFDocumentProxy) {
-            // This helps ensure clean state for new documents
-            setTimeout(() => {
-              if (window.gc) {
-                window.gc();
-              }
-            }, 50);
+        // Force cleanup before loading new document
+        setTimeout(() => {
+          if (typeof (window as any).gc === "function") {
+            (window as any).gc();
           }
-        });
+        }, 50);
       } catch (error) {
         console.log("Document switch cleanup:", error);
       }
@@ -583,22 +567,20 @@ export default function PDFViewer({
     setRetryCount(0);
 
     // Generate completely new document key to force re-render
-    const newKey = `${instanceId}-${fileUrl}-${Date.now()}-${Math.random()}`;
+    const newKey = `${instanceId}-${fileUrl}-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     setDocumentKey(newKey);
 
     // Force cleanup of any existing PDF.js state
     if (typeof window !== "undefined") {
       try {
-        import("pdfjs-dist").then((pdfjs) => {
-          // Clear any document caches
-          if (pdfjs.getDocument && pdfjs.getDocument.cache) {
-            try {
-              pdfjs.getDocument.cache.clear();
-            } catch (e) {
-              console.log("Cache clear error:", e);
-            }
+        // Simple cleanup without relying on internal APIs
+        setTimeout(() => {
+          if (typeof (window as any).gc === "function") {
+            (window as any).gc();
           }
-        });
+        }, 100);
       } catch (error) {
         console.log("Document reset error:", error);
       }
