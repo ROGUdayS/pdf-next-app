@@ -347,13 +347,43 @@ export default function PDFViewer({
     else await document.exitFullscreen();
   }
 
-  function handleDownload() {
-    const a = document.createElement("a");
-    a.href = fileUrl;
-    a.download = fileName;
-    document.body.append(a);
-    a.click();
-    a.remove();
+  async function handleDownload() {
+    try {
+      // Fetch the PDF file as a blob
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const blob = await response.blob();
+
+      // Create a blob URL
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      // Create temporary link element and force download
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      a.style.display = "none";
+
+      // Append to document, click, and cleanup
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Cleanup blob URL after a short delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      // Fallback to the original method if fetch fails
+      const a = document.createElement("a");
+      a.href = fileUrl;
+      a.download = fileName;
+      document.body.append(a);
+      a.click();
+      a.remove();
+    }
   }
 
   function openInNewTab() {
