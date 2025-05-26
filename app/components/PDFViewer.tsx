@@ -297,7 +297,11 @@ export default function PDFViewer({
     if (typeof window !== "undefined") {
       try {
         // Clear PDF.js internal caches by forcing worker reload
-        const pdfjsLib = (window as any).pdfjsLib;
+        const pdfjsLib = (
+          window as unknown as {
+            pdfjsLib?: { GlobalWorkerOptions?: { workerSrc: string } };
+          }
+        ).pdfjsLib;
         if (pdfjsLib?.GlobalWorkerOptions) {
           pdfjsLib.GlobalWorkerOptions.workerSrc =
             "/pdf-worker/pdf.worker.min.js";
@@ -714,7 +718,7 @@ export default function PDFViewer({
                   <span>Rotate</span>
                 </button>
 
-                {canDownload && (
+                {canDownload && isSaved && (
                   <button
                     onClick={handleDownload}
                     className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center justify-center space-x-2"
@@ -1096,7 +1100,7 @@ export default function PDFViewer({
               </button>
             )}
 
-            {canDownload && (
+            {canDownload && isSaved && (
               <button
                 onClick={handleDownload}
                 className="p-2 hover:bg-secondary rounded-md text-foreground"
@@ -1118,7 +1122,7 @@ export default function PDFViewer({
               </button>
             )}
 
-            {canOpenInNewTab && (
+            {canOpenInNewTab && isSaved && (
               <button
                 onClick={openInNewTab}
                 className="p-2 hover:bg-secondary rounded-md text-foreground"
