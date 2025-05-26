@@ -24,7 +24,6 @@ import {
   getDownloadURL,
   deleteObject,
 } from "firebase/storage";
-import { generatePdfThumbnail } from "@/app/utils/pdfjs";
 
 interface SharedPdfData {
   id: string;
@@ -396,41 +395,9 @@ export default function SharedPDFPage() {
 
         const data = pdfSnapshot.data();
 
-        // Check if the PDF is publicly shared
-        if (!data.isPubliclyShared) {
-          // If user is not authenticated and the PDF is not public, show error
-          if (!user) {
-            // Don't redirect, just show the login prompt
-            setPdfData({
-              id: pdfSnapshot.id,
-              name: data.name || "Untitled",
-              url: data.url,
-              uploadedBy: data.uploadedBy || "Unknown",
-              uploadedAt:
-                data.uploadedAt?.toDate?.() || new Date().toISOString(),
-              isPubliclyShared: false,
-              thumbnailUrl: data.thumbnailUrl || null,
-              size: data.size || 0,
-              accessUsers: data.accessUsers || [],
-              ownerId: data.ownerId,
-              storagePath: data.storagePath,
-              allowSave: data.allowSave || false,
-            });
-            setError("Please log in to view this PDF");
-            setIsLoading(false);
-            return;
-          }
-
-          // If user is not in accessUsers and not the owner, show error
-          if (
-            !data.accessUsers.includes(user.email) &&
-            data.ownerId !== user.uid
-          ) {
-            setError("You don't have permission to view this PDF");
-            setIsLoading(false);
-            return;
-          }
-        }
+        // NEW LOGIC: Allow viewing for all users, but restrict actions based on authentication and permissions
+        // Non-authenticated users can view any shared PDF but with limited permissions
+        // Authenticated users get full permissions based on allowSave flag and whether they've saved the PDF
 
         // If user is authenticated and not already in accessUsers, add them
         if (
@@ -488,18 +455,6 @@ export default function SharedPDFPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="text-red-500 mb-4">{error}</div>
-        {!user && pdfData && !pdfData.isPubliclyShared && (
-          <div className="mb-4">
-            <Link
-              href={`/signin?redirect=${encodeURIComponent(
-                `/shared/${params.id}`
-              )}`}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Log in to access
-            </Link>
-          </div>
-        )}
         <Link href="/" className="text-blue-500 hover:text-blue-600 underline">
           Go to Home
         </Link>
@@ -531,9 +486,39 @@ export default function SharedPDFPage() {
               <div className="text-sm text-gray-500">
                 Shared by: {pdfData.uploadedBy}
               </div>
-              {!pdfData.allowSave && (
+
+              {/* Permission Status Messages */}
+              {!user && (
+                <div className="mt-2 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                  📖 Viewing mode -
+                  <Link
+                    href={`/signin?redirect=${encodeURIComponent(
+                      `/shared/${params.id}`
+                    )}`}
+                    className="underline hover:text-blue-800 ml-1"
+                  >
+                    Log in
+                  </Link>
+                  {pdfData.allowSave && " to save and download this PDF"}
+                </div>
+              )}
+
+              {user && !pdfData.allowSave && (
                 <div className="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md inline-block">
-                  View only - Saving not allowed
+                  🔒 View only - Saving and downloading not allowed by owner
+                </div>
+              )}
+
+              {user && pdfData.allowSave && !isSaved && (
+                <div className="mt-2 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-md inline-block">
+                  💾 Save this PDF to your collection to enable download and
+                  open in new tab
+                </div>
+              )}
+
+              {user && isSaved && (
+                <div className="mt-2 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-md inline-block">
+                  ✅ Saved to your collection - Full access enabled
                 </div>
               )}
             </div>
@@ -681,11 +666,15 @@ export default function SharedPDFPage() {
             fileName={pdfData.name}
             canShare={false}
             isAuthenticated={!!user}
-            canDownload={!!user && pdfData.allowSave}
-            canOpenInNewTab={!!user && pdfData.allowSave}
-            onLogin={() => router.push("/signin")}
+            canDownload={!!user && isSaved}
+            canOpenInNewTab={!!user && isSaved}
+            onLogin={() =>
+              router.push(
+                `/signin?redirect=${encodeURIComponent(`/shared/${params.id}`)}`
+              )
+            }
             onSaveToCollection={
-              pdfData.allowSave ? handleSaveToCollection : undefined
+              user && pdfData.allowSave ? handleSaveToCollection : undefined
             }
             isSaved={isSaved}
             pdfId={pdfData.id}

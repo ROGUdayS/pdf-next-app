@@ -3,8 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /pdfs/{pdfId} {
-      // Allow read if PDF is publicly shared or user is authenticated
-      allow read: if resource.data.isPubliclyShared == true || request.auth != null;
+      // Allow read for all users (authenticated and non-authenticated)
+      // This enables the new permission model where viewing is always allowed
+      // but actions (download, save, etc.) are controlled in the application
+      allow read: if true;
       
       // Allow create if user is authenticated
       allow create: if request.auth != null;
