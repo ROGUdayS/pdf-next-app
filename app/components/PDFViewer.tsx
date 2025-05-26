@@ -87,7 +87,12 @@ export default function PDFViewer({
       .substr(2, 9)}`;
 
     // Add delay to ensure proper cleanup between PDF switches
-    const loadNewPdf = () => {
+    const loadNewPdf = async () => {
+      // Force PDF.js reinitialization before loading new PDF
+      if (typeof (window as any).forcePDFJSReinit === "function") {
+        await (window as any).forcePDFJSReinit();
+      }
+
       setDocumentKey(newKey);
       setRetryCount(0);
     };
@@ -97,7 +102,7 @@ export default function PDFViewer({
       // Force cleanup of previous document
       setNumPages(null);
       setError(null);
-      setTimeout(loadNewPdf, 200); // Increased delay for better cleanup
+      setTimeout(loadNewPdf, 300); // Increased delay for better cleanup
     } else {
       loadNewPdf();
     }
@@ -366,17 +371,29 @@ export default function PDFViewer({
   // Build URL - use proxy for authenticated users, direct URL for non-authenticated
   const pdfUrl = useMemo(() => {
     if (!isAuthenticated) {
-      return fileUrl;
+      // Add cache busting for non-authenticated URLs too
+      const url = new URL(fileUrl);
+      url.searchParams.set("_cb", `${instanceId}-${Date.now()}`);
+      return url.toString();
     }
     if (!authToken) return null;
     const u = new URL("/api/pdf-proxy", getBaseUrl());
     u.searchParams.set("url", fileUrl);
     u.searchParams.set("token", authToken);
+    // Add cache busting parameter
+    u.searchParams.set("_cb", `${instanceId}-${Date.now()}`);
     return u.toString();
-  }, [fileUrl, authToken, isAuthenticated]);
+  }, [fileUrl, authToken, isAuthenticated, instanceId]);
 
   // Reset state on file change with more aggressive cleanup
   useEffect(() => {
+    console.log(`PDFViewer: File change detected`, {
+      instanceId,
+      fileUrl: fileUrl.substring(0, 50) + "...",
+      pdfUrl: pdfUrl?.substring(0, 50) + "...",
+      timestamp: Date.now(),
+    });
+
     setError(null);
     setPageNumber(1);
     setScale(1.0);
@@ -395,7 +412,7 @@ export default function PDFViewer({
       `PDF loaded successfully: ${instanceId}, pages: ${numPages}, URL: ${pdfUrl?.substring(
         0,
         50
-      )}...`
+      )}..., fileUrl: ${fileUrl.substring(0, 50)}...`
     );
   };
 
@@ -404,6 +421,7 @@ export default function PDFViewer({
       error: e.message,
       stack: e.stack,
       url: pdfUrl?.substring(0, 100),
+      fileUrl: fileUrl.substring(0, 100),
       userAgent:
         typeof window !== "undefined" ? window.navigator.userAgent : "unknown",
       hostname:
@@ -559,12 +577,17 @@ export default function PDFViewer({
   };
 
   // Force complete document reset when switching PDFs
-  const resetDocument = () => {
+  const resetDocument = async () => {
     setNumPages(null);
     setPageNumber(1);
     setScale(1.0);
     setError(null);
     setRetryCount(0);
+
+    // Force PDF.js reinitialization
+    if (typeof (window as any).forcePDFJSReinit === "function") {
+      await (window as any).forcePDFJSReinit();
+    }
 
     // Generate completely new document key to force re-render
     const newKey = `${instanceId}-${fileUrl}-${Date.now()}-${Math.random()

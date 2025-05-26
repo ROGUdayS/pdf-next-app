@@ -1,5 +1,8 @@
 // Dynamic PDF.js configuration for client-side only
 if (typeof window !== "undefined") {
+  // Store original getDocument function
+  let originalGetDocument: any = null;
+
   // Use a self-executing async function with error handling
   (async () => {
     try {
@@ -12,19 +15,28 @@ if (typeof window !== "undefined") {
       // Set worker options with additional configuration for production
       pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
+      // Store the original getDocument function
+      originalGetDocument = pdfjs.getDocument;
+
       // Additional configuration for better performance and stability
       if (pdfjs.GlobalWorkerOptions) {
         // Set maximum number of workers for better resource management
         if (typeof pdfjs.getDocument === "function") {
-          // Store original function
-          const originalGetDocument = pdfjs.getDocument;
-
           // Override getDocument to force fresh instances in production
           pdfjs.getDocument = function (src: any) {
             const isProduction =
               window.location.hostname.includes("netlify") ||
               window.location.hostname.includes("vercel") ||
               process.env.NODE_ENV === "production";
+
+            console.log("PDF.js getDocument called:", {
+              src:
+                typeof src === "string"
+                  ? src.substring(0, 100) + "..."
+                  : "object",
+              isProduction,
+              timestamp: Date.now(),
+            });
 
             // If src is already an object with options, merge with our options
             let finalSrc = src;
@@ -51,8 +63,10 @@ if (typeof window !== "undefined") {
                   disableRange: true,
                   disableWorker: true,
                   verbosity: 0,
-                  // Force fresh document loading
-                  cacheKey: `${Date.now()}-${Math.random()}`,
+                  // Force fresh document loading with unique cache key
+                  cacheKey: `${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substr(2, 9)}`,
                   // Disable any internal caching
                   useOnlyCssZoom: true,
                 }),
@@ -69,9 +83,32 @@ if (typeof window !== "undefined") {
                 disableRange: true,
                 disableWorker: true,
                 verbosity: 0,
-                cacheKey: `${Date.now()}-${Math.random()}`,
+                cacheKey: `${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substr(2, 9)}`,
                 useOnlyCssZoom: true,
               };
+            }
+
+            // Force cleanup before creating new document
+            if (isProduction) {
+              try {
+                // Clear any existing document caches
+                if (typeof (pdfjs.getDocument as any).cache !== "undefined") {
+                  try {
+                    (pdfjs.getDocument as any).cache.clear();
+                  } catch (e) {
+                    console.log("Cache clear attempt:", e);
+                  }
+                }
+
+                // Force garbage collection if available
+                if (typeof (window as any).gc === "function") {
+                  (window as any).gc();
+                }
+              } catch (e) {
+                console.log("Pre-load cleanup:", e);
+              }
             }
 
             return originalGetDocument(finalSrc);
@@ -146,4 +183,29 @@ if (typeof window !== "undefined") {
       }
     }
   })();
+
+  // Export a function to force PDF.js reinitialization
+  (window as any).forcePDFJSReinit = async () => {
+    try {
+      const pdfjs = await import("pdfjs-dist");
+
+      // Clear all caches
+      if (typeof (pdfjs.getDocument as any).cache !== "undefined") {
+        try {
+          (pdfjs.getDocument as any).cache.clear();
+        } catch (e) {
+          console.log("Force reinit cache clear:", e);
+        }
+      }
+
+      // Force garbage collection
+      if (typeof (window as any).gc === "function") {
+        (window as any).gc();
+      }
+
+      console.log("PDF.js force reinitialized");
+    } catch (e) {
+      console.log("Force reinit error:", e);
+    }
+  };
 }
