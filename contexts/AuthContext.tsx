@@ -19,7 +19,6 @@ import {
   where,
   onSnapshot,
   orderBy,
-  limit,
 } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 
@@ -34,6 +33,7 @@ interface AuthContextType {
     ownedCount: number;
     sharedCount: number;
     recentPdfs: RecentPdf[];
+    storageUsed: number;
   };
 }
 
@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ownedCount: 0,
     sharedCount: 0,
     recentPdfs: [] as RecentPdf[],
+    storageUsed: 0,
   });
   const router = useRouter();
 
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ownedCount: 0,
           sharedCount: 0,
           recentPdfs: [],
+          storageUsed: 0,
         });
         // Remove the token cookie
         document.cookie =
@@ -128,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailVerified: user.emailVerified,
       });
 
-      // Listen for owned PDFs count
+      // Listen for owned PDFs count and storage used
       const ownedQuery = query(
         collection(db, "pdfs"),
         where("ownerId", "==", user.uid)
@@ -136,26 +138,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribeOwned = onSnapshot(
         ownedQuery,
         (snapshot) => {
-          console.log("Owned PDFs query result:", { size: snapshot.size });
-          setPdfStats((prev) => ({ ...prev, ownedCount: snapshot.size }));
+          const ownedCount = snapshot.size;
+          const storageUsed = snapshot.docs.reduce((total, doc) => {
+            const data = doc.data();
+            return total + (data.size || 0);
+          }, 0);
+
+          console.log("Owned PDFs query result:", {
+            size: ownedCount,
+            storageUsed: storageUsed,
+          });
+
+          setPdfStats((prev) => ({
+            ...prev,
+            ownedCount: ownedCount,
+            storageUsed: storageUsed,
+          }));
         },
         (error: FirebaseError) => {
           console.error("Error in owned PDFs query:", error);
         }
       );
 
-      // Listen for shared PDFs count
-      const sharedQuery = query(
-        collection(db, "pdfs"),
-        where("accessUsers", "array-contains", user.email)
-      );
+      // Listen for shared PDFs count - get all PDFs and filter client-side
+      const allPdfsQuery = query(collection(db, "pdfs"));
       unsubscribeShared = onSnapshot(
-        sharedQuery,
+        allPdfsQuery,
         (snapshot) => {
-          // Filter out PDFs owned by the user to get only truly shared PDFs
-          const sharedPdfsCount = snapshot.docs.filter(
-            (doc) => doc.data().ownerId !== user.uid
-          ).length;
+          // Filter for PDFs where user has access but is not the owner
+          const sharedPdfsCount = snapshot.docs.filter((doc) => {
+            const data = doc.data();
+
+            // Skip if this is the user's own PDF
+            if (data.ownerId === user.uid) return false;
+
+            const accessUsers = data.accessUsers || [];
+
+            // Check both old format (string array) and new format (object array)
+            return accessUsers.some(
+              (userAccess: string | { email: string; canSave: boolean }) => {
+                if (typeof userAccess === "string") {
+                  return userAccess === user.email;
+                } else {
+                  return userAccess.email === user.email;
+                }
+              }
+            );
+          }).length;
+
           console.log("Shared PDFs query result:", {
             total: snapshot.size,
             sharedByOthers: sharedPdfsCount,
@@ -167,18 +197,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       );
 
-      // Listen for recent PDFs
-      const recentQuery = query(
+      // Listen for recent PDFs - get all PDFs and filter client-side
+      const recentPdfsQuery = query(
         collection(db, "pdfs"),
-        where("accessUsers", "array-contains", user.email),
-        orderBy("uploadedAt", "desc"),
-        limit(3)
+        orderBy("uploadedAt", "desc")
       );
       unsubscribeRecent = onSnapshot(
-        recentQuery,
+        recentPdfsQuery,
         (snapshot) => {
-          console.log("Recent PDFs query result:", { size: snapshot.size });
-          const recentPdfs = snapshot.docs.map((doc) => ({
+          // Filter for PDFs where user has access
+          const filteredDocs = snapshot.docs.filter((doc) => {
+            const data = doc.data();
+            const accessUsers = data.accessUsers || [];
+
+            // Check both old format (string array) and new format (object array)
+            return accessUsers.some(
+              (userAccess: string | { email: string; canSave: boolean }) => {
+                if (typeof userAccess === "string") {
+                  return userAccess === user.email;
+                } else {
+                  return userAccess.email === user.email;
+                }
+              }
+            );
+          });
+
+          console.log("Recent PDFs query result:", {
+            size: filteredDocs.length,
+          });
+          const recentPdfs = filteredDocs.slice(0, 3).map((doc) => ({
             id: doc.id,
             name: doc.data().name,
             uploadedAt: doc.data().uploadedAt.toDate(),

@@ -661,16 +661,24 @@ export default function PDFsPage() {
       // Update the PDF document with the new access user
       const pdfRef = doc(db, "pdfs", sharingPdf.id);
 
-      // Check if the email is already in the access list
-      const isExistingUser = sharingPdf.accessUsers.includes(email);
+      // Create user object with permissions
+      const newUserAccess = {
+        email: email,
+        canSave: allowSave,
+        addedAt: new Date(),
+      };
 
-      // Only update Firestore if it's a new user or allowSave has changed
-      if (!isExistingUser || sharingPdf.allowSave !== allowSave) {
+      // Check if the email is already in the access list
+      const isExistingUser = sharingPdf.accessUsers.some((userEmail: string) =>
+        typeof userEmail === "string"
+          ? userEmail === email
+          : userEmail.email === email
+      );
+
+      // Update Firestore with new user access structure
+      if (!isExistingUser) {
         await updateDoc(pdfRef, {
-          accessUsers: isExistingUser
-            ? sharingPdf.accessUsers
-            : [...sharingPdf.accessUsers, email],
-          allowSave: allowSave,
+          accessUsers: [...sharingPdf.accessUsers, newUserAccess],
         });
       }
 
@@ -696,15 +704,12 @@ export default function PDFsPage() {
       }
 
       // Update local state only if needed
-      if (!isExistingUser || sharingPdf.allowSave !== allowSave) {
+      if (!isExistingUser) {
         setPdfs((current) => {
           const newMap = new Map(current);
           const updatedPdf = {
             ...sharingPdf,
-            accessUsers: isExistingUser
-              ? sharingPdf.accessUsers
-              : [...sharingPdf.accessUsers, email],
-            allowSave: allowSave,
+            accessUsers: [...sharingPdf.accessUsers, newUserAccess],
           };
           newMap.set(sharingPdf.id, updatedPdf);
           return newMap;
@@ -1534,6 +1539,7 @@ export default function PDFsPage() {
           onShareViaEmail={handleShareViaEmail}
           onShareViaLink={handleShareViaLink}
           pdfName={sharingPdf.name}
+          pdfId={sharingPdf.id}
         />
       )}
 

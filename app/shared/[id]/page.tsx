@@ -53,6 +53,7 @@ export default function SharedPDFPage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [userCanSave, setUserCanSave] = useState(false);
 
   // Check if PDF is already saved in user's collection
   useEffect(() => {
@@ -395,23 +396,77 @@ export default function SharedPDFPage() {
 
         const data = pdfSnapshot.data();
 
-        // NEW LOGIC: Allow viewing for all users, but restrict actions based on authentication and permissions
-        // Non-authenticated users can view any shared PDF but with limited permissions
-        // Authenticated users get full permissions based on allowSave flag and whether they've saved the PDF
+        // ACCESS CONTROL LOGIC:
+        // 1. Check if PDF is publicly shared OR user has explicit access
+        // 2. For non-authenticated users: only allow if publicly shared
+        // 3. For authenticated users: allow if publicly shared OR in accessUsers OR is owner
 
-        // If user is authenticated and not already in accessUsers, add them
+        const isOwner = user?.uid === data.ownerId;
+
+        // Handle both old format (string array) and new format (object array)
+        const accessUsers = data.accessUsers || [];
+        const userAccess = user?.email
+          ? accessUsers.find(
+              (userAccess: string | { email: string; canSave: boolean }) => {
+                if (typeof userAccess === "string") {
+                  return userAccess === user.email;
+                } else {
+                  return userAccess.email === user.email;
+                }
+              }
+            )
+          : null;
+
+        const hasExplicitAccess = !!userAccess;
+        const canSave =
+          userAccess && typeof userAccess === "object"
+            ? userAccess.canSave
+            : data.allowSave;
+        const isPubliclyShared = data.isPubliclyShared === true;
+
+        // Update user permission state
+        setUserCanSave(canSave);
+
+        // Check access permissions
+        if (!isPubliclyShared && !isOwner && !hasExplicitAccess) {
+          setError(
+            "This PDF is not publicly shared and you don't have access to it"
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        // If user is authenticated and not already in accessUsers, add them (only if they have access)
+        const isUserInAccessList = data.accessUsers.some(
+          (userAccess: string | { email: string; canSave: boolean }) => {
+            if (typeof userAccess === "string") {
+              return userAccess === user?.email;
+            } else {
+              return userAccess.email === user?.email;
+            }
+          }
+        );
+
         if (
           user?.email &&
-          !data.accessUsers.includes(user.email) &&
-          data.ownerId !== user.uid
+          !isUserInAccessList &&
+          data.ownerId !== user.uid &&
+          (isPubliclyShared || hasExplicitAccess)
         ) {
           try {
+            // Add user in the new object format
+            const newUserAccess = {
+              email: user.email,
+              canSave: data.allowSave || false,
+              addedAt: new Date(),
+            };
+
             await updateDoc(pdfDoc, {
-              accessUsers: [...data.accessUsers, user.email],
+              accessUsers: [...data.accessUsers, newUserAccess],
             });
             console.log("Added user to shared list:", user.email);
             // Update the data object with the new accessUsers list
-            data.accessUsers = [...data.accessUsers, user.email];
+            data.accessUsers = [...data.accessUsers, newUserAccess];
           } catch (error) {
             console.error("Error adding user to shared list:", error);
             // Continue showing the PDF even if adding to shared list fails
@@ -503,13 +558,14 @@ export default function SharedPDFPage() {
                 </div>
               )}
 
-              {user && !pdfData.allowSave && (
+              {user && !userCanSave && (
                 <div className="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md inline-block">
-                  🔒 View only - Saving and downloading not allowed by owner
+                  🔒 View only - Saving and downloading not allowed for your
+                  access level
                 </div>
               )}
 
-              {user && pdfData.allowSave && !isSaved && (
+              {user && userCanSave && !isSaved && (
                 <div className="mt-2 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-md inline-block">
                   💾 Save this PDF to your collection to enable download and
                   open in new tab
@@ -674,7 +730,7 @@ export default function SharedPDFPage() {
               )
             }
             onSaveToCollection={
-              user && pdfData.allowSave ? handleSaveToCollection : undefined
+              user && userCanSave ? handleSaveToCollection : undefined
             }
             isSaved={isSaved}
             pdfId={pdfData.id}
