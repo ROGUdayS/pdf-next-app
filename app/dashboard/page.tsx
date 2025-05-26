@@ -862,6 +862,8 @@ export default function Dashboard() {
           }
           canShare={selectedPdf.isOwned}
           canDownload={selectedPdf.allowSave}
+          canOpenInNewTab={selectedPdf.allowSave}
+          isSaved={selectedPdf.isOwned}
           pdfId={selectedPdf.id}
           isOwner={selectedPdf.isOwned}
         />
