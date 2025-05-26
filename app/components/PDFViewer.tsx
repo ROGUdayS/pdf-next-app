@@ -80,8 +80,19 @@ export default function PDFViewer({
   // Generate unique key for each PDF to force re-render
   useEffect(() => {
     const newKey = `${instanceId}-${fileUrl}-${Date.now()}`;
-    setDocumentKey(newKey);
-    setRetryCount(0);
+
+    // Add delay to ensure proper cleanup between PDF switches
+    const loadNewPdf = () => {
+      setDocumentKey(newKey);
+      setRetryCount(0);
+    };
+
+    // If this is a PDF switch (not initial load), add delay for cleanup
+    if (documentKey) {
+      setTimeout(loadNewPdf, 100);
+    } else {
+      loadNewPdf();
+    }
   }, [instanceId, fileUrl]);
 
   // Set mobile-friendly defaults
@@ -264,15 +275,23 @@ export default function PDFViewer({
       maxImageSize: 1024 * 1024,
       isEvalSupported: false,
       useSystemFonts: true,
-      // Add worker fallback for Netlify compatibility
+      // Completely disable worker in production for better isolation
       disableWorker:
         typeof window !== "undefined" &&
-        window.location.hostname.includes("netlify"),
+        (window.location.hostname.includes("netlify") ||
+          window.location.hostname.includes("vercel") ||
+          process.env.NODE_ENV === "production"),
+      // Force new document context
+      verbosity: 0,
+      // Disable caching to prevent conflicts
+      disableRange: true,
+      // Use legacy build for better compatibility
+      useOnlyCssZoom: true,
     }),
     []
   );
 
-  // Cleanup effect for component unmount
+  // Cleanup effect for component unmount with more aggressive cleanup
   useEffect(() => {
     return () => {
       // Cleanup any PDF.js resources when component unmounts
@@ -280,9 +299,30 @@ export default function PDFViewer({
         // Force garbage collection of PDF.js resources
         try {
           import("pdfjs-dist").then((pdfjs) => {
-            // Clear any cached documents
-            if (pdfjs.PDFDocumentProxy) {
-              // This helps with memory cleanup
+            // Clear any cached documents and workers
+            if (pdfjs.PDFWorker) {
+              // Destroy any existing workers
+              try {
+                pdfjs.PDFWorker.getWorkerSrc = () => null;
+              } catch (e) {
+                console.log("Worker cleanup:", e);
+              }
+            }
+
+            // Force cleanup of document cache
+            if (typeof pdfjs.getDocument === "function") {
+              // Clear internal caches
+              try {
+                // This helps clear any cached documents
+                const cleanup = () => {
+                  if (window.gc) {
+                    window.gc();
+                  }
+                };
+                setTimeout(cleanup, 100);
+              } catch (e) {
+                console.log("Cache cleanup:", e);
+              }
             }
           });
         } catch (error) {
@@ -291,6 +331,28 @@ export default function PDFViewer({
       }
     };
   }, []);
+
+  // Add document cleanup when switching PDFs
+  useEffect(() => {
+    // Clear any existing PDF.js state when switching documents
+    if (typeof window !== "undefined" && documentKey) {
+      try {
+        import("pdfjs-dist").then((pdfjs) => {
+          // Force cleanup before loading new document
+          if (pdfjs.PDFDocumentProxy) {
+            // This helps ensure clean state for new documents
+            setTimeout(() => {
+              if (window.gc) {
+                window.gc();
+              }
+            }, 50);
+          }
+        });
+      } catch (error) {
+        console.log("Document switch cleanup:", error);
+      }
+    }
+  }, [documentKey]);
 
   // Fullscreen listener
   useEffect(() => {
@@ -329,7 +391,7 @@ export default function PDFViewer({
     return u.toString();
   }, [fileUrl, authToken, isAuthenticated]);
 
-  // Reset state on file change
+  // Reset state on file change with more aggressive cleanup
   useEffect(() => {
     setError(null);
     setPageNumber(1);
@@ -337,8 +399,9 @@ export default function PDFViewer({
     setNumPages(null);
     const isMobile = window.innerWidth < 768;
     setFitMode(isMobile ? "page" : "width");
-    // Force re-render with new key
-    setDocumentKey(`${instanceId}-${fileUrl}-${Date.now()}`);
+
+    // Force complete document reset
+    resetDocument();
   }, [fileUrl, instanceId]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -362,6 +425,7 @@ export default function PDFViewer({
       hostname:
         typeof window !== "undefined" ? window.location.hostname : "unknown",
       retryCount,
+      documentKey,
     });
     setError(`Failed to load PDF: ${e.message}`);
   }
@@ -376,9 +440,7 @@ export default function PDFViewer({
 
       setTimeout(() => {
         setRetryCount((prev) => prev + 1);
-        setDocumentKey(
-          `${instanceId}-${fileUrl}-${Date.now()}-retry-${retryCount + 1}`
-        );
+        resetDocument();
         setIsRetrying(false);
       }, delay);
     } else {
@@ -498,7 +560,7 @@ export default function PDFViewer({
     const pages = [];
     for (let i = 1; i <= numPages; i++) {
       pages.push(
-        <div key={`page_${i}`} className="mb-4">
+        <div key={`page_${i}_${documentKey}`} className="mb-4">
           <Page
             pageNumber={i}
             scale={scale}
@@ -510,6 +572,37 @@ export default function PDFViewer({
       );
     }
     return pages;
+  };
+
+  // Force complete document reset when switching PDFs
+  const resetDocument = () => {
+    setNumPages(null);
+    setPageNumber(1);
+    setScale(1.0);
+    setError(null);
+    setRetryCount(0);
+
+    // Generate completely new document key to force re-render
+    const newKey = `${instanceId}-${fileUrl}-${Date.now()}-${Math.random()}`;
+    setDocumentKey(newKey);
+
+    // Force cleanup of any existing PDF.js state
+    if (typeof window !== "undefined") {
+      try {
+        import("pdfjs-dist").then((pdfjs) => {
+          // Clear any document caches
+          if (pdfjs.getDocument && pdfjs.getDocument.cache) {
+            try {
+              pdfjs.getDocument.cache.clear();
+            } catch (e) {
+              console.log("Cache clear error:", e);
+            }
+          }
+        });
+      } catch (error) {
+        console.log("Document reset error:", error);
+      }
+    }
   };
 
   if (!pdfUrl) {
@@ -1403,9 +1496,7 @@ export default function PDFViewer({
                     <button
                       onClick={() => {
                         setError(null);
-                        setDocumentKey(
-                          `${instanceId}-${fileUrl}-${Date.now()}`
-                        );
+                        resetDocument();
                       }}
                       className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                     >
@@ -1427,15 +1518,18 @@ export default function PDFViewer({
                 options={options}
               >
                 {viewMode === "continuous" ? (
-                  <div className="space-y-4">{renderAllPages()}</div>
+                  <div className="space-y-4" key={`continuous-${documentKey}`}>
+                    {renderAllPages()}
+                  </div>
                 ) : (
                   <div
+                    key={`single-${documentKey}`}
                     className={`flex ${
                       isSideBySide && !showComments ? "space-x-4" : ""
                     }`}
                   >
                     <Page
-                      key={`page_${pageNumber}_rot_${rotation}`}
+                      key={`page_${pageNumber}_rot_${rotation}_${documentKey}`}
                       pageNumber={pageNumber}
                       scale={scale}
                       rotate={rotation}
@@ -1445,7 +1539,9 @@ export default function PDFViewer({
                       pageNumber < (numPages || 0) &&
                       !showComments && (
                         <Page
-                          key={`page_${pageNumber + 1}_rot_${rotation}`}
+                          key={`page_${
+                            pageNumber + 1
+                          }_rot_${rotation}_${documentKey}`}
                           pageNumber={pageNumber + 1}
                           scale={scale}
                           rotate={rotation}
