@@ -923,10 +923,6 @@ export default function Dashboard() {
           onShareViaEmail={async (email: string, allowSave: boolean) => {
             console.log("Share via email:", email, allowSave);
           }}
-          onShareViaLink={async (allowSave: boolean) => {
-            console.log("Share via link:", allowSave);
-            return "https://example.com/shared/link";
-          }}
         />
       )}
     </div>
