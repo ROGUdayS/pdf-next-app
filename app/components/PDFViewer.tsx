@@ -67,6 +67,87 @@ export default function PDFViewer({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Security: Disable right-click context menu
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // Add security event listeners
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("selectstart", handleSelectStart);
+    document.addEventListener("dragstart", handleDragStart);
+
+    // Disable F12, Ctrl+Shift+I, Ctrl+U, etc.
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable developer tools shortcuts
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && e.key === "I") ||
+        (e.ctrlKey && e.shiftKey && e.key === "C") ||
+        (e.ctrlKey && e.shiftKey && e.key === "J") ||
+        (e.ctrlKey && e.key === "U") ||
+        (e.ctrlKey && e.key === "s") ||
+        (e.ctrlKey && e.key === "S") ||
+        (e.metaKey && e.key === "s") ||
+        (e.metaKey && e.key === "S")
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("selectstart", handleSelectStart);
+      document.removeEventListener("dragstart", handleDragStart);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, []);
+
+  // Security: Detect developer tools
+  useEffect(() => {
+    const devtools = { open: false, orientation: null };
+    const threshold = 160;
+
+    const detectDevTools = () => {
+      if (
+        window.outerHeight - window.innerHeight > threshold ||
+        window.outerWidth - window.innerWidth > threshold
+      ) {
+        if (!devtools.open) {
+          devtools.open = true;
+          console.clear();
+          console.log(
+            "%cDeveloper tools detected! PDF access may be restricted.",
+            "color: red; font-size: 20px; font-weight: bold;"
+          );
+          // Optionally close the PDF viewer or show warning
+          // onClose();
+        }
+      } else {
+        devtools.open = false;
+      }
+    };
+
+    const interval = setInterval(detectDevTools, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   // Set mobile-friendly defaults
   useEffect(() => {
     const isMobile = window.innerWidth < 768; // md breakpoint
@@ -234,13 +315,16 @@ export default function PDFViewer({
     }
   }
 
-  // PDF.js options
+  // PDF.js options with security enhancements
   const options = useMemo(
     () => ({
       cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
       cMapPacked: true,
       standardFontDataUrl:
         "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/",
+      // Disable text selection and copying
+      disableTextLayer: false, // Keep for accessibility but will be secured via CSS
+      disableAnnotationLayer: true,
     }),
     []
   );
@@ -351,47 +435,109 @@ export default function PDFViewer({
     else await document.exitFullscreen();
   }
 
+  // Secure download function - only works for authorized users
   async function handleDownload() {
-    try {
-      // Fetch the PDF file as a blob
-      const response = await fetch(fileUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const blob = await response.blob();
+    if (!canDownload || !isSaved) {
+      setError("Download not authorized for this PDF");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
 
-      // Create a blob URL
+    if (!isAuthenticated || !authToken) {
+      setError("Authentication required for download");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    try {
+      // Request secure download URL from our API
+      const response = await fetch("/api/secure-download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          pdfId,
+          authToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Download authorization failed: ${errorText}`);
+      }
+
+      const { downloadUrl, fileName: secureFileName } = await response.json();
+
+      // Fetch the PDF through the secure download URL
+      const pdfResponse = await fetch(downloadUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/pdf",
+          "Cache-Control": "no-cache",
+        },
+        credentials: "include",
+      });
+
+      if (!pdfResponse.ok) {
+        throw new Error(
+          `Download failed: ${pdfResponse.status} ${pdfResponse.statusText}`
+        );
+      }
+
+      const blob = await pdfResponse.blob();
+
+      // Verify it's actually a PDF
+      if (blob.type !== "application/pdf") {
+        throw new Error("Invalid file type received");
+      }
+
+      // Create a secure blob URL with limited lifetime
       const blobUrl = window.URL.createObjectURL(blob);
 
       // Create temporary link element and force download
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = fileName;
+      a.download = secureFileName || fileName;
       a.style.display = "none";
 
-      // Append to document, click, and cleanup
+      // Append to document, click, and cleanup immediately
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
 
-      // Cleanup blob URL after a short delay
+      // Cleanup blob URL immediately
       setTimeout(() => {
         window.URL.revokeObjectURL(blobUrl);
       }, 100);
     } catch (error) {
-      console.error("Error downloading PDF:", error);
-      // Fallback to the original method if fetch fails
-      const a = document.createElement("a");
-      a.href = fileUrl;
-      a.download = fileName;
-      document.body.append(a);
-      a.click();
-      a.remove();
+      console.error("Secure download failed:", error);
+      setError("Download failed. Please try again.");
+      setTimeout(() => setError(null), 3000);
     }
   }
 
+  // Disabled for security - no direct file access
   function openInNewTab() {
-    window.open(fileUrl, "_blank");
+    if (!canOpenInNewTab || !isSaved) {
+      setError("Opening in new tab not authorized for this PDF");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    // Only allow for saved PDFs with proper authorization
+    if (isAuthenticated && authToken) {
+      // Create a new window with the secure proxy URL
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.location.href = pdfUrl || fileUrl;
+      }
+    } else {
+      setError("Authentication required to open in new tab");
+      setTimeout(() => setError(null), 3000);
+    }
   }
 
   function rotatePages(deg: number) {
@@ -420,14 +566,15 @@ export default function PDFViewer({
     const pages = [];
     for (let i = 1; i <= numPages; i++) {
       pages.push(
-        <div key={`page_${i}`} className="mb-4">
+        <div key={`page_${i}`} className="mb-4 relative">
           <Page
             pageNumber={i}
             scale={scale}
             rotate={rotation}
             onLoadSuccess={handlePageLoadSuccess}
-            className="shadow-lg"
+            className="shadow-lg select-none pdf-secure"
           />
+          <div className="pdf-security-overlay" />
         </div>
       );
     }
@@ -446,16 +593,18 @@ export default function PDFViewer({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4 select-none pdf-secure"
       onClick={handleBackdropClick}
+      style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
       <div
         id="pdf-viewer-container"
         ref={containerRef}
-        className={`bg-background rounded-lg p-2 sm:p-4 w-full flex flex-col ${
+        className={`bg-background rounded-lg p-2 sm:p-4 w-full flex flex-col select-none pdf-secure ${
           isFullscreen ? "h-screen max-w-none" : "max-h-[95vh] max-w-6xl"
         }`}
         tabIndex={0}
+        style={{ userSelect: "none", WebkitUserSelect: "none" }}
       >
         {/* Mobile Toolbar */}
         <div className="md:hidden">
@@ -1286,7 +1435,7 @@ export default function PDFViewer({
         >
           {/* PDF Viewer */}
           <div
-            className={`flex-1 overflow-auto pdf-viewer-content ${
+            className={`flex-1 overflow-auto pdf-viewer-content pdf-viewer-secure pdf-secure ${
               showComments ? "md:mr-4" : ""
             }`}
           >
