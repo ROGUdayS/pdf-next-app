@@ -145,3 +145,131 @@
     color: var(--muted-foreground);
   }
 }
+
+/* PDF Security Styles */
+.pdf-secure {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  pointer-events: auto;
+}
+
+.pdf-secure * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Disable text selection on PDF pages */
+.react-pdf__Page {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.react-pdf__Page * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Disable text layer selection */
+.react-pdf__Page__textContent {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.react-pdf__Page__textContent * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+/* Disable canvas context menu */
+.react-pdf__Page__canvas {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  pointer-events: auto;
+}
+
+/* Prevent image saving */
+.react-pdf__Page__canvas {
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+}
+
+/* Security overlay to prevent direct canvas access */
+.pdf-security-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: transparent;
+}
+
+/* Hide scrollbars in secure mode */
+.pdf-viewer-secure::-webkit-scrollbar {
+  display: none;
+}
+
+.pdf-viewer-secure {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Disable print styles for secure PDFs */
+@media print {
+  .pdf-secure {
+    display: none !important;
+  }
+
+  .react-pdf__Page {
+    display: none !important;
+  }
+}
+
+/* Disable highlighting */
+.pdf-secure ::selection {
+  background: transparent !important;
+}
+
+.pdf-secure ::-moz-selection {
+  background: transparent !important;
+}
+
+/* Additional security for mobile devices */
+@media (max-width: 768px) {
+  .pdf-secure {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: pan-y !important;
+  }
+}
