@@ -2,28 +2,16 @@
   command = "npm run build"
   publish = ".next"
 
-# Ensure PDF worker files are served with correct MIME type and headers
 [[headers]]
-  for = "/pdf-worker/*"
+  for = "/api/pdf-proxy"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    Content-Type = "application/javascript"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
 
 [[headers]]
-  for = "*.worker.js"
+  for = "/api/pdf-proxy/*"
   [headers.values]
-    Content-Type = "application/javascript"
-
-# API routes headers
-[[headers]]
-  for = "/api/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-
-# Static assets caching
-[[headers]]
-  for = "/_next/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable" 
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0" 
