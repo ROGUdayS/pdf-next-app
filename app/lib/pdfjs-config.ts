@@ -19,9 +19,16 @@ if (typeof window !== "undefined") {
 
         // Set maximum number of workers for better resource management
         if (typeof pdfjs.getDocument === "function") {
-          // Configure document loading options
+          // Store original function
           const originalGetDocument = pdfjs.getDocument;
+
+          // Override getDocument to force fresh instances in production
           pdfjs.getDocument = function (src, options = {}) {
+            const isProduction =
+              window.location.hostname.includes("netlify") ||
+              window.location.hostname.includes("vercel") ||
+              process.env.NODE_ENV === "production";
+
             return originalGetDocument(src, {
               ...options,
               // Disable streaming for better compatibility on Netlify
@@ -34,8 +41,45 @@ if (typeof window !== "undefined") {
               disableFontFace: false,
               // Use system fonts when possible
               useSystemFonts: true,
+              // Production-specific options
+              ...(isProduction && {
+                // Disable all caching in production
+                disableRange: true,
+                disableWorker: true,
+                verbosity: 0,
+                // Force fresh document loading
+                cacheKey: `${Date.now()}-${Math.random()}`,
+                // Disable any internal caching
+                useOnlyCssZoom: true,
+              }),
             });
           };
+
+          // Clear any existing caches in production
+          if (
+            window.location.hostname.includes("netlify") ||
+            window.location.hostname.includes("vercel") ||
+            process.env.NODE_ENV === "production"
+          ) {
+            try {
+              // Clear document cache if it exists
+              if (pdfjs.getDocument.cache) {
+                pdfjs.getDocument.cache.clear();
+              }
+
+              // Disable global caching
+              if (pdfjs.PDFDocumentProxy) {
+                pdfjs.PDFDocumentProxy.prototype.cleanup = function () {
+                  // Force cleanup of all resources
+                  if (this._transport) {
+                    this._transport.destroy();
+                  }
+                };
+              }
+            } catch (e) {
+              console.log("Cache clearing:", e);
+            }
+          }
         }
       }
 
