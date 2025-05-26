@@ -1,0 +1,29 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Ensure PDF worker files are served with correct MIME type and headers
+[[headers]]
+  for = "/pdf-worker/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "*.worker.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+
+# API routes headers
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Static assets caching
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable" 
