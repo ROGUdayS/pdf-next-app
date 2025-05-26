@@ -5,11 +5,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const pdfUrl = searchParams.get("url");
     const authToken = searchParams.get("token");
+    const pdfId = searchParams.get("pdfId");
+    const timestamp = searchParams.get("t");
 
     console.log("PDF Proxy Request:", {
       url: pdfUrl?.substring(0, 100) + "...", // Log first 100 chars for debugging
+      pdfId,
+      timestamp,
       hasToken: !!authToken,
-      timestamp: new Date().toISOString(),
+      requestTime: new Date().toISOString(),
     });
 
     if (!pdfUrl) {
@@ -37,17 +41,32 @@ export async function GET(request: Request) {
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    console.log("PDF fetched successfully, size:", arrayBuffer.byteLength);
+    console.log("PDF fetched successfully:", {
+      size: arrayBuffer.byteLength,
+      pdfId,
+      timestamp,
+    });
+
+    // Generate unique response identifier
+    const responseId = `${pdfId}-${timestamp}-${Date.now()}`;
 
     return new NextResponse(arrayBuffer, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "inline",
         "Access-Control-Allow-Origin": "*",
-        // Disable caching to prevent serving wrong PDFs
-        "Cache-Control": "no-cache, no-store, must-revalidate",
+        // Aggressive cache prevention
+        "Cache-Control":
+          "no-cache, no-store, must-revalidate, private, max-age=0",
         Pragma: "no-cache",
         Expires: "0",
+        // Vary headers to prevent proxy caching
+        Vary: "Authorization, Accept, Accept-Encoding",
+        // Unique response identifier
+        "X-PDF-Response-ID": responseId,
+        // Additional cache busting
+        "Last-Modified": new Date().toUTCString(),
+        ETag: `"${responseId}"`,
       },
     });
   } catch (error) {

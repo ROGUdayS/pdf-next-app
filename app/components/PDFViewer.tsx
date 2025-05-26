@@ -279,8 +279,11 @@ export default function PDFViewer({
     const u = new URL("/api/pdf-proxy", getBaseUrl());
     u.searchParams.set("url", fileUrl);
     u.searchParams.set("token", authToken);
+    // Add unique identifiers to prevent caching
+    u.searchParams.set("pdfId", pdfId);
+    u.searchParams.set("t", Date.now().toString());
     return u.toString();
-  }, [fileUrl, authToken, isAuthenticated]);
+  }, [fileUrl, authToken, isAuthenticated, pdfId]);
 
   // Reset state on file change
   useEffect(() => {
@@ -289,7 +292,21 @@ export default function PDFViewer({
     setScale(1.0);
     const isMobile = window.innerWidth < 768;
     setFitMode(isMobile ? "page" : "width");
-  }, [fileUrl]);
+
+    // Clear any potential PDF.js caches
+    if (typeof window !== "undefined") {
+      try {
+        // Clear PDF.js internal caches by forcing worker reload
+        const pdfjsLib = (window as any).pdfjsLib;
+        if (pdfjsLib?.GlobalWorkerOptions) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "/pdf-worker/pdf.worker.min.js";
+        }
+      } catch (e) {
+        console.log("PDF.js cache clear attempt:", e);
+      }
+    }
+  }, [fileUrl, pdfId]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -1247,10 +1264,10 @@ export default function PDFViewer({
               }`}
             >
               <Document
-                key={pdfUrl}
                 file={pdfUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
                 onLoadError={onDocumentLoadError}
+                key={`pdf-${pdfId}-${fileUrl}`}
                 loading={
                   <div className="flex items-center justify-center h-32">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
