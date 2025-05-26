@@ -139,29 +139,32 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-background py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
+        <div className="text-center">
+          <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             Verify your email
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             We've sent a verification code to{" "}
-            <span className="font-medium text-indigo-600">{email}</span>
+            <span className="font-medium text-primary">{email}</span>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleVerify}>
+        <form
+          className="mt-6 sm:mt-8 space-y-4 sm:space-y-6"
+          onSubmit={handleVerify}
+        >
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 sm:p-4">
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 
           <div>
             <label
               htmlFor="otp"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-foreground mb-1"
             >
               Verification Code
             </label>
@@ -174,7 +177,7 @@ export default function VerifyEmail() {
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder="Enter 6-digit code"
-                className="text-center text-2xl tracking-widest"
+                className="text-center text-2xl tracking-widest h-11 sm:h-12"
                 maxLength={6}
               />
             </div>
@@ -183,7 +186,7 @@ export default function VerifyEmail() {
           <div>
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-11 sm:h-12"
               disabled={loading || countdown === 0}
             >
               {loading ? "Verifying..." : "Verify Email"}
@@ -192,7 +195,7 @@ export default function VerifyEmail() {
 
           <div className="text-center">
             {countdown > 0 ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Code expires in {formatTime(countdown)}
               </p>
             ) : (
@@ -201,7 +204,7 @@ export default function VerifyEmail() {
                 variant="ghost"
                 onClick={handleResendOTP}
                 disabled={loading}
-                className="text-indigo-600 hover:text-indigo-500"
+                className="text-primary hover:text-primary/80"
               >
                 Resend verification code
               </Button>
