@@ -13,7 +13,6 @@ import {
   doc,
   updateDoc,
   arrayRemove,
-  deleteDoc,
   setDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -33,6 +32,7 @@ interface SharedPDF {
   isSaved: boolean;
   size?: number;
   allowSave?: boolean;
+  userCanSave?: boolean; // User's specific permission level
 }
 
 type ViewMode = "grid" | "list";
@@ -263,45 +263,87 @@ export default function SharedPDFsPage() {
 
     setError(null);
 
-    const sharedQuery = query(
-      collection(db, "pdfs"),
-      where("accessUsers", "array-contains", user.email)
-    );
+    // We need to get all PDFs and filter client-side because accessUsers can be either
+    // an array of strings (old format) or array of objects (new format)
+    const allPdfsQuery = query(collection(db, "pdfs"));
 
     const unsubscribe = onSnapshot(
-      sharedQuery,
+      allPdfsQuery,
       async (snapshot) => {
         try {
-          const updatedPdfs = await Promise.all(
-            snapshot.docs
-              .filter((doc) => doc.data().ownerId !== user.uid)
-              .map(async (doc) => {
-                const data = doc.data() as DocumentData;
-                const pdf: SharedPDF = {
-                  id: doc.id,
-                  name: data.name || "Untitled",
-                  url: data.url,
-                  uploadedBy: data.uploadedBy || "Unknown",
-                  uploadedAt: data.uploadedAt?.toDate() || new Date(),
-                  thumbnailUrl: data.thumbnailUrl || null,
-                  ownerId: data.ownerId,
-                  isSaved: false,
-                  size: data.size || 0,
-                  allowSave: data.allowSave || false,
-                };
+          const filteredDocs = snapshot.docs.filter((doc) => {
+            const data = doc.data();
 
-                if (user?.uid) {
-                  const savedQuery = query(
-                    collection(db, "pdfs"),
-                    where("originalPdfId", "==", pdf.id),
-                    where("ownerId", "==", user.uid)
-                  );
-                  const savedSnapshot = await getDocs(savedQuery);
-                  pdf.isSaved = !savedSnapshot.empty;
+            // Skip if this is the user's own PDF
+            if (data.ownerId === user.uid) return false;
+
+            // Check if user has access to this PDF
+            const accessUsers = data.accessUsers || [];
+
+            // Check both old format (string array) and new format (object array)
+            const hasAccess = accessUsers.some(
+              (userAccess: string | { email: string; canSave: boolean }) => {
+                if (typeof userAccess === "string") {
+                  return userAccess === user.email;
+                } else {
+                  return userAccess.email === user.email;
                 }
+              }
+            );
 
-                return pdf;
-              })
+            return hasAccess;
+          });
+
+          const updatedPdfs = await Promise.all(
+            filteredDocs.map(async (doc) => {
+              const data = doc.data() as DocumentData;
+
+              // Determine user's permission level
+              const accessUsers = data.accessUsers || [];
+              let userCanSave = data.allowSave || false; // Default fallback
+
+              // Find user's specific permission
+              const userAccess = accessUsers.find(
+                (userAccess: string | { email: string; canSave: boolean }) => {
+                  if (typeof userAccess === "string") {
+                    return userAccess === user.email;
+                  } else {
+                    return userAccess.email === user.email;
+                  }
+                }
+              );
+
+              // If user found in new format, use their specific permission
+              if (userAccess && typeof userAccess === "object") {
+                userCanSave = userAccess.canSave;
+              }
+
+              const pdf: SharedPDF = {
+                id: doc.id,
+                name: data.name || "Untitled",
+                url: data.url,
+                uploadedBy: data.uploadedBy || "Unknown",
+                uploadedAt: data.uploadedAt?.toDate() || new Date(),
+                thumbnailUrl: data.thumbnailUrl || null,
+                ownerId: data.ownerId,
+                isSaved: false,
+                size: data.size || 0,
+                allowSave: data.allowSave || false, // Global permission
+                userCanSave: userCanSave, // User's specific permission
+              };
+
+              if (user?.uid) {
+                const savedQuery = query(
+                  collection(db, "pdfs"),
+                  where("originalPdfId", "==", pdf.id),
+                  where("ownerId", "==", user.uid)
+                );
+                const savedSnapshot = await getDocs(savedQuery);
+                pdf.isSaved = !savedSnapshot.empty;
+              }
+
+              return pdf;
+            })
           );
 
           setSharedPdfs(updatedPdfs);
@@ -398,9 +440,14 @@ export default function SharedPDFsPage() {
                     Saved to My PDFs
                   </span>
                 )}
-                {pdf.allowSave && !pdf.isSaved && (
+                {pdf.userCanSave && !pdf.isSaved && (
                   <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
                     Can Save
+                  </span>
+                )}
+                {!pdf.userCanSave && (
+                  <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-400 rounded">
+                    View Only
                   </span>
                 )}
               </div>
@@ -425,8 +472,8 @@ export default function SharedPDFsPage() {
 
                   <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
-                      {/* Save PDF option - only show if allowSave is true and not already saved */}
-                      {pdf.allowSave && !pdf.isSaved && (
+                      {/* Save PDF option - only show if userCanSave is true and not already saved */}
+                      {pdf.userCanSave && !pdf.isSaved && (
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -573,9 +620,14 @@ export default function SharedPDFsPage() {
                       Saved
                     </span>
                   )}
-                  {pdf.allowSave && !pdf.isSaved && (
+                  {pdf.userCanSave && !pdf.isSaved && (
                     <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
                       Can Save
+                    </span>
+                  )}
+                  {!pdf.userCanSave && (
+                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-400 rounded">
+                      View Only
                     </span>
                   )}
                 </div>
@@ -618,8 +670,8 @@ export default function SharedPDFsPage() {
 
                   <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
-                      {/* Save PDF option - only show if allowSave is true and not already saved */}
-                      {pdf.allowSave && !pdf.isSaved && (
+                      {/* Save PDF option - only show if userCanSave is true and not already saved */}
+                      {pdf.userCanSave && !pdf.isSaved && (
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -746,9 +798,14 @@ export default function SharedPDFsPage() {
                             Saved
                           </span>
                         )}
-                        {pdf.allowSave && !pdf.isSaved && (
+                        {pdf.userCanSave && !pdf.isSaved && (
                           <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded flex-shrink-0">
                             Can Save
+                          </span>
+                        )}
+                        {!pdf.userCanSave && (
+                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-400 rounded flex-shrink-0">
+                            View Only
                           </span>
                         )}
                       </div>
@@ -791,8 +848,8 @@ export default function SharedPDFsPage() {
 
                         <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                           <div className="py-1">
-                            {/* Save PDF option - only show if allowSave is true and not already saved */}
-                            {pdf.allowSave && !pdf.isSaved && (
+                            {/* Save PDF option - only show if userCanSave is true and not already saved */}
+                            {pdf.userCanSave && !pdf.isSaved && (
                               <Menu.Item>
                                 {({ active }) => (
                                   <button
@@ -917,7 +974,7 @@ export default function SharedPDFsPage() {
           pdfId={selectedPdf.id}
           isOwner={selectedPdf.ownerId === user.uid}
           onSaveToCollection={
-            selectedPdf.allowSave &&
+            selectedPdf.userCanSave &&
             selectedPdf.ownerId !== user?.uid &&
             !selectedPdf.isSaved
               ? () => handleSaveToCollection(selectedPdf)
@@ -934,6 +991,7 @@ export default function SharedPDFsPage() {
           onShareViaEmail={async () => {}}
           onShareViaLink={async () => ""}
           pdfName={sharingPdf.name}
+          pdfId={sharingPdf.id}
         />
       )}
 

@@ -95,16 +95,31 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    const recentQuery = query(
+    // Get all PDFs and filter client-side to handle both old and new accessUsers formats
+    const allPdfsQuery = query(
       collection(db, "pdfs"),
-      where("accessUsers", "array-contains", user.email),
-      orderBy("uploadedAt", "desc"),
-      limit(6)
+      orderBy("uploadedAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(recentQuery, async (snapshot) => {
+    const unsubscribe = onSnapshot(allPdfsQuery, async (snapshot) => {
+      const filteredDocs = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+        const accessUsers = data.accessUsers || [];
+
+        // Check both old format (string array) and new format (object array)
+        return accessUsers.some(
+          (userAccess: string | { email: string; canSave: boolean }) => {
+            if (typeof userAccess === "string") {
+              return userAccess === user.email;
+            } else {
+              return userAccess.email === user.email;
+            }
+          }
+        );
+      });
+
       const pdfs = await Promise.all(
-        snapshot.docs.map((doc) => processPdf(doc))
+        filteredDocs.slice(0, 6).map((doc) => processPdf(doc))
       );
       setRecentPdfs(pdfs);
     });
@@ -135,18 +150,35 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    const sharedQuery = query(
+    // Get all PDFs and filter client-side to handle both old and new accessUsers formats
+    const allPdfsQuery = query(
       collection(db, "pdfs"),
-      where("accessUsers", "array-contains", user.email),
-      orderBy("uploadedAt", "desc"),
-      limit(4)
+      orderBy("uploadedAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(sharedQuery, async (snapshot) => {
+    const unsubscribe = onSnapshot(allPdfsQuery, async (snapshot) => {
+      const filteredDocs = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+
+        // Skip if this is the user's own PDF
+        if (data.ownerId === user.uid) return false;
+
+        const accessUsers = data.accessUsers || [];
+
+        // Check both old format (string array) and new format (object array)
+        return accessUsers.some(
+          (userAccess: string | { email: string; canSave: boolean }) => {
+            if (typeof userAccess === "string") {
+              return userAccess === user.email;
+            } else {
+              return userAccess.email === user.email;
+            }
+          }
+        );
+      });
+
       const pdfs = await Promise.all(
-        snapshot.docs
-          .filter((doc) => doc.data().ownerId !== user.uid)
-          .map((doc) => processPdf(doc))
+        filteredDocs.slice(0, 4).map((doc) => processPdf(doc))
       );
       setSharedPdfs(pdfs);
     });
@@ -157,15 +189,31 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
+    // Get all PDFs and filter client-side to handle both old and new accessUsers formats
     const allPdfsQuery = query(
       collection(db, "pdfs"),
-      where("accessUsers", "array-contains", user.email),
       orderBy("uploadedAt", "desc")
     );
 
     const unsubscribe = onSnapshot(allPdfsQuery, async (snapshot) => {
+      const filteredDocs = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+        const accessUsers = data.accessUsers || [];
+
+        // Check both old format (string array) and new format (object array)
+        return accessUsers.some(
+          (userAccess: string | { email: string; canSave: boolean }) => {
+            if (typeof userAccess === "string") {
+              return userAccess === user.email;
+            } else {
+              return userAccess.email === user.email;
+            }
+          }
+        );
+      });
+
       const pdfs = await Promise.all(
-        snapshot.docs.map((doc) => processPdf(doc))
+        filteredDocs.map((doc) => processPdf(doc))
       );
       setAllPdfs(pdfs);
     });
@@ -503,14 +551,11 @@ export default function Dashboard() {
                 Total Storage
               </h3>
               <p className="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">
-                {formatFileSize(
-                  [...ownedPdfs, ...sharedPdfs].reduce(
-                    (total, pdf) => total + pdf.size,
-                    0
-                  )
-                )}
+                {formatFileSize(pdfStats.storageUsed)}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">Space used</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Space used by your PDFs
+              </p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
               <svg
@@ -873,6 +918,7 @@ export default function Dashboard() {
         <ShareDialog
           isOpen={!!sharingPdf}
           pdfName={sharingPdf.name}
+          pdfId={sharingPdf.id}
           onClose={() => setSharingPdf(null)}
           onShareViaEmail={async (email: string, allowSave: boolean) => {
             console.log("Share via email:", email, allowSave);
