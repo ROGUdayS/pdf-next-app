@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import {
   collection,
   query,
@@ -14,7 +14,9 @@ import {
   updateDoc,
   arrayRemove,
   deleteDoc,
+  setDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import PDFViewer from "@/app/components/PDFViewer";
 import ShareDialog from "@/app/components/ShareDialog";
 import { Menu } from "@headlessui/react";
@@ -40,56 +42,62 @@ type SortDirection = "asc" | "desc";
 export default function SharedPDFsPage() {
   const { user } = useAuth();
   const [sharedPdfs, setSharedPdfs] = useState<SharedPDF[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<SharedPDF | null>(null);
   const [sharingPdf, setSharingPdf] = useState<SharedPDF | null>(null);
-  const [removingPdfId, setRemovingPdfId] = useState<string | null>(null);
-
-  // New state for view options, search, and sorting
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [removingPdfId, setRemovingPdfId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Enhanced sorted and filtered PDFs with search and sorting
   const filteredAndSortedPdfs = useMemo(() => {
-    let filtered = [...sharedPdfs];
+    let filtered = sharedPdfs;
 
     // Apply search filter
     if (searchTerm.trim()) {
-      filtered = filtered.filter(
+      const searchLower = searchTerm.toLowerCase();
+      filtered = sharedPdfs.filter(
         (pdf) =>
-          pdf.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pdf.uploadedBy.toLowerCase().includes(searchTerm.toLowerCase())
+          pdf.name.toLowerCase().includes(searchLower) ||
+          pdf.uploadedBy.toLowerCase().includes(searchLower)
       );
     }
 
     // Apply sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (sortBy) {
         case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "date":
-          comparison = a.uploadedAt.getTime() - b.uploadedAt.getTime();
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
           break;
         case "size":
-          comparison = (a.size || 0) - (b.size || 0);
+          aValue = a.size || 0;
+          bValue = b.size || 0;
           break;
         case "sharedBy":
-          comparison = a.uploadedBy.localeCompare(b.uploadedBy);
+          aValue = a.uploadedBy.toLowerCase();
+          bValue = b.uploadedBy.toLowerCase();
           break;
+        case "date":
         default:
-          comparison = b.uploadedAt.getTime() - a.uploadedAt.getTime();
+          aValue = a.uploadedAt;
+          bValue = b.uploadedAt;
+          break;
       }
 
-      return sortDirection === "asc" ? comparison : -comparison;
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
     });
 
-    return filtered;
+    return sorted;
   }, [sharedPdfs, searchTerm, sortBy, sortDirection]);
 
   const removeFromShared = async (pdfId: string) => {
@@ -97,34 +105,135 @@ export default function SharedPDFsPage() {
 
     try {
       setRemovingPdfId(pdfId);
-      setError(null);
 
-      // First, check if there's a saved copy
-      const savedQuery = query(
-        collection(db, "pdfs"),
-        where("originalPdfId", "==", pdfId),
-        where("ownerId", "==", user.uid)
-      );
-      const savedSnapshot = await getDocs(savedQuery);
+      // Get the PDF document
+      const pdfDoc = doc(db, "pdfs", pdfId);
 
-      // If there's a saved copy, delete it
-      if (!savedSnapshot.empty) {
-        await deleteDoc(doc(db, "pdfs", savedSnapshot.docs[0].id));
-      }
-
-      // Remove user's access from the original shared PDF
-      const pdfRef = doc(db, "pdfs", pdfId);
-      await updateDoc(pdfRef, {
+      // Remove the user's email from the accessUsers array
+      await updateDoc(pdfDoc, {
         accessUsers: arrayRemove(user.email),
       });
 
-      setError("Removed from shared list");
-      setTimeout(() => setError(null), 3000);
-    } catch (err) {
-      console.error("Error removing from shared list:", err);
-      setError("Failed to remove from shared list");
+      // Update local state
+      setSharedPdfs((current) => current.filter((pdf) => pdf.id !== pdfId));
+    } catch (error) {
+      console.error("Error removing PDF from shared list:", error);
+      setError("Failed to remove PDF from shared list");
     } finally {
       setRemovingPdfId(null);
+    }
+  };
+
+  // Handle saving PDF to user's collection
+  const handleSaveToCollection = async (pdf: SharedPDF) => {
+    if (!user || !pdf || isSaving) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      // Check if already saved
+      const savedQuery = query(
+        collection(db, "pdfs"),
+        where("originalPdfId", "==", pdf.id),
+        where("savedBy", "==", user.uid)
+      );
+      const savedSnapshot = await getDocs(savedQuery);
+
+      if (!savedSnapshot.empty) {
+        setError("You have already saved this PDF");
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+
+      // Create a new document in the PDFs collection
+      const firestoreDocRef = doc(collection(db, "pdfs"));
+
+      // First, download the PDF file
+      const pdfResponse = await fetch(pdf.url);
+      const pdfBlob = await pdfResponse.blob();
+
+      // Create a new storage path for the user's copy
+      const fileName = `${Date.now()}-${pdf.name}`;
+      const newStoragePath = `pdfs/${user.uid}/${fileName}`;
+      const storageRef = ref(storage, newStoragePath);
+
+      // Upload the PDF to the user's storage bucket
+      await uploadBytes(storageRef, pdfBlob, {
+        contentType: "application/pdf",
+        customMetadata: {
+          originalPdfId: pdf.id,
+          originalName: pdf.name,
+          originalOwnerId: pdf.ownerId,
+        },
+      });
+
+      // Get the URL for the new PDF
+      const newPdfUrl = await getDownloadURL(storageRef);
+
+      // Handle thumbnail
+      let thumbnailUrl = null;
+      let thumbnailPath = null;
+
+      // If original has thumbnail, copy it
+      if (pdf.thumbnailUrl) {
+        try {
+          const thumbnailResponse = await fetch(pdf.thumbnailUrl);
+          const thumbnailBlob = await thumbnailResponse.blob();
+
+          const thumbnailFileName = `${firestoreDocRef.id}.png`;
+          thumbnailPath = `pdfs/${user.uid}/thumbnails/${thumbnailFileName}`;
+          const thumbnailRef = ref(storage, thumbnailPath);
+
+          await uploadBytes(thumbnailRef, thumbnailBlob, {
+            contentType: "image/png",
+            customMetadata: {
+              pdfId: firestoreDocRef.id,
+              originalName: pdf.name,
+              originalOwnerId: pdf.ownerId,
+            },
+          });
+
+          thumbnailUrl = await getDownloadURL(thumbnailRef);
+        } catch (thumbnailError) {
+          console.error("Error copying thumbnail:", thumbnailError);
+        }
+      }
+
+      const savedPdfData = {
+        name: pdf.name,
+        url: newPdfUrl,
+        uploadedBy: pdf.uploadedBy,
+        uploadedAt: new Date(),
+        savedBy: user.uid,
+        originalPdfId: pdf.id,
+        isPubliclyShared: false,
+        accessUsers: [user.email],
+        thumbnailUrl: thumbnailUrl,
+        thumbnailPath: thumbnailPath,
+        size: pdf.size,
+        ownerId: user.uid,
+        storagePath: newStoragePath,
+        allowSave: pdf.allowSave,
+      };
+
+      await setDoc(firestoreDocRef, savedPdfData);
+      console.log("PDF saved successfully:", savedPdfData);
+
+      // Update the local state to reflect that this PDF is now saved
+      setSharedPdfs((current) =>
+        current.map((p) => (p.id === pdf.id ? { ...p, isSaved: true } : p))
+      );
+
+      // Also update the selectedPdf if it's the same PDF
+      if (selectedPdf && selectedPdf.id === pdf.id) {
+        setSelectedPdf({ ...selectedPdf, isSaved: true });
+      }
+    } catch (err) {
+      console.error("Error saving PDF to collection:", err);
+      setError("Failed to save PDF to your collection");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -196,6 +305,17 @@ export default function SharedPDFsPage() {
           );
 
           setSharedPdfs(updatedPdfs);
+
+          // Update selectedPdf if it exists and its saved status has changed
+          if (selectedPdf) {
+            const updatedSelectedPdf = updatedPdfs.find(
+              (p) => p.id === selectedPdf.id
+            );
+            if (updatedSelectedPdf) {
+              setSelectedPdf(updatedSelectedPdf);
+            }
+          }
+
           setIsLoading(false);
         } catch (err) {
           console.error("Error processing shared PDFs:", err);
@@ -211,7 +331,7 @@ export default function SharedPDFsPage() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, selectedPdf?.id]);
 
   // Grid view component
   const GridView = ({ pdfs }: { pdfs: SharedPDF[] }) => (
@@ -278,6 +398,11 @@ export default function SharedPDFsPage() {
                     Saved to My PDFs
                   </span>
                 )}
+                {pdf.allowSave && !pdf.isSaved && (
+                  <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
+                    Can Save
+                  </span>
+                )}
               </div>
 
               <div className="relative flex-shrink-0">
@@ -300,6 +425,42 @@ export default function SharedPDFsPage() {
 
                   <Menu.Items className="absolute right-0 z-50 bottom-full mb-2 w-48 origin-bottom-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
+                      {/* Save PDF option - only show if allowSave is true and not already saved */}
+                      {pdf.allowSave && !pdf.isSaved && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveToCollection(pdf);
+                              }}
+                              disabled={isSaving}
+                              className={`${active ? "bg-accent" : ""} ${
+                                isSaving ? "opacity-50 cursor-not-allowed" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-green-600`}
+                            >
+                              {isSaving ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-3"></div>
+                              ) : (
+                                <svg
+                                  className="mr-3 h-5 w-5 text-green-600"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                  />
+                                </svg>
+                              )}
+                              Save PDF
+                            </button>
+                          )}
+                        </Menu.Item>
+                      )}
                       <Menu.Item>
                         {({ active }) => (
                           <button
@@ -412,6 +573,11 @@ export default function SharedPDFsPage() {
                       Saved
                     </span>
                   )}
+                  {pdf.allowSave && !pdf.isSaved && (
+                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
+                      Can Save
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="col-span-2">
@@ -452,6 +618,42 @@ export default function SharedPDFsPage() {
 
                   <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                     <div className="py-1">
+                      {/* Save PDF option - only show if allowSave is true and not already saved */}
+                      {pdf.allowSave && !pdf.isSaved && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveToCollection(pdf);
+                              }}
+                              disabled={isSaving}
+                              className={`${active ? "bg-accent" : ""} ${
+                                isSaving ? "opacity-50 cursor-not-allowed" : ""
+                              } flex w-full items-center px-4 py-2 text-sm text-green-600`}
+                            >
+                              {isSaving ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-3"></div>
+                              ) : (
+                                <svg
+                                  className="mr-3 h-5 w-5 text-green-600"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                  />
+                                </svg>
+                              )}
+                              Save PDF
+                            </button>
+                          )}
+                        </Menu.Item>
+                      )}
                       <Menu.Item>
                         {({ active }) => (
                           <button
@@ -544,6 +746,11 @@ export default function SharedPDFsPage() {
                             Saved
                           </span>
                         )}
+                        {pdf.allowSave && !pdf.isSaved && (
+                          <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded flex-shrink-0">
+                            Can Save
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">
@@ -584,6 +791,44 @@ export default function SharedPDFsPage() {
 
                         <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right divide-y divide-border rounded-md bg-popover shadow-lg ring-1 ring-border focus:outline-none">
                           <div className="py-1">
+                            {/* Save PDF option - only show if allowSave is true and not already saved */}
+                            {pdf.allowSave && !pdf.isSaved && (
+                              <Menu.Item>
+                                {({ active }) => (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSaveToCollection(pdf);
+                                    }}
+                                    disabled={isSaving}
+                                    className={`${active ? "bg-accent" : ""} ${
+                                      isSaving
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
+                                    } flex w-full items-center px-4 py-2 text-sm text-green-600`}
+                                  >
+                                    {isSaving ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-3"></div>
+                                    ) : (
+                                      <svg
+                                        className="mr-3 h-5 w-5 text-green-600"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        />
+                                      </svg>
+                                    )}
+                                    Save PDF
+                                  </button>
+                                )}
+                              </Menu.Item>
+                            )}
                             <Menu.Item>
                               {({ active }) => (
                                 <button
@@ -672,11 +917,10 @@ export default function SharedPDFsPage() {
           pdfId={selectedPdf.id}
           isOwner={selectedPdf.ownerId === user.uid}
           onSaveToCollection={
-            selectedPdf.allowSave && selectedPdf.ownerId !== user?.uid
-              ? async () => {
-                  // Add your save to collection logic here
-                  console.log("Save to collection:", selectedPdf.id);
-                }
+            selectedPdf.allowSave &&
+            selectedPdf.ownerId !== user?.uid &&
+            !selectedPdf.isSaved
+              ? () => handleSaveToCollection(selectedPdf)
               : undefined
           }
           isSaved={selectedPdf.isSaved}
