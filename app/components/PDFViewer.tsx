@@ -77,6 +77,7 @@ export default function PDFViewer({
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDocumentLoading, setIsDocumentLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +96,7 @@ export default function PDFViewer({
 
       setDocumentKey(newKey);
       setRetryCount(0);
+      setIsDocumentLoading(false); // Allow document to render
     };
 
     // If this is a PDF switch (not initial load), add delay for cleanup
@@ -102,7 +104,8 @@ export default function PDFViewer({
       // Force cleanup of previous document
       setNumPages(null);
       setError(null);
-      setTimeout(loadNewPdf, 300); // Increased delay for better cleanup
+      setIsDocumentLoading(true); // Block document rendering during switch
+      setTimeout(loadNewPdf, 500); // Increased delay for better cleanup
     } else {
       loadNewPdf();
     }
@@ -373,7 +376,11 @@ export default function PDFViewer({
     if (!isAuthenticated) {
       // Add cache busting for non-authenticated URLs too
       const url = new URL(fileUrl);
-      url.searchParams.set("_cb", `${instanceId}-${Date.now()}`);
+      url.searchParams.set(
+        "_cb",
+        `${instanceId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      );
+      url.searchParams.set("_nocache", "true");
       return url.toString();
     }
     if (!authToken) return null;
@@ -381,9 +388,13 @@ export default function PDFViewer({
     u.searchParams.set("url", fileUrl);
     u.searchParams.set("token", authToken);
     // Add cache busting parameter
-    u.searchParams.set("_cb", `${instanceId}-${Date.now()}`);
+    u.searchParams.set(
+      "_cb",
+      `${instanceId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    );
+    u.searchParams.set("_nocache", "true");
     return u.toString();
-  }, [fileUrl, authToken, isAuthenticated, instanceId]);
+  }, [fileUrl, authToken, isAuthenticated, instanceId, documentKey]);
 
   // Reset state on file change with more aggressive cleanup
   useEffect(() => {
@@ -578,6 +589,7 @@ export default function PDFViewer({
 
   // Force complete document reset when switching PDFs
   const resetDocument = async () => {
+    setIsDocumentLoading(true); // Block document rendering
     setNumPages(null);
     setPageNumber(1);
     setScale(1.0);
@@ -603,9 +615,11 @@ export default function PDFViewer({
           if (typeof (window as any).gc === "function") {
             (window as any).gc();
           }
-        }, 100);
+          setIsDocumentLoading(false); // Allow document to render after cleanup
+        }, 200);
       } catch (error) {
         console.log("Document reset error:", error);
+        setIsDocumentLoading(false);
       }
     }
   };
@@ -1483,79 +1497,91 @@ export default function PDFViewer({
                   : ""
               }`}
             >
-              <Document
-                key={documentKey}
-                file={pdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                loading={
-                  <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+              {isDocumentLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Switching PDF...</p>
                   </div>
-                }
-                error={
-                  <div className="text-center py-8">
-                    <div className="text-destructive mb-2">
-                      {error || "Failed to load PDF."}
+                </div>
+              ) : (
+                <Document
+                  key={documentKey}
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
                     </div>
-                    <button
-                      onClick={() => {
-                        setError(null);
-                        resetDocument();
-                      }}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                    >
-                      Try Again
-                    </button>
-                    {retryCount < 3 && (
+                  }
+                  error={
+                    <div className="text-center py-8">
+                      <div className="text-destructive mb-2">
+                        {error || "Failed to load PDF."}
+                      </div>
                       <button
-                        onClick={handleRetry}
-                        disabled={isRetrying}
-                        className="ml-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50"
+                        onClick={() => {
+                          setError(null);
+                          resetDocument();
+                        }}
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                       >
-                        {isRetrying
-                          ? `Retrying in ${Math.pow(2, retryCount)}s...`
-                          : `Auto Retry (${retryCount}/3)`}
+                        Try Again
                       </button>
-                    )}
-                  </div>
-                }
-                options={options}
-              >
-                {viewMode === "continuous" ? (
-                  <div className="space-y-4" key={`continuous-${documentKey}`}>
-                    {renderAllPages()}
-                  </div>
-                ) : (
-                  <div
-                    key={`single-${documentKey}`}
-                    className={`flex ${
-                      isSideBySide && !showComments ? "space-x-4" : ""
-                    }`}
-                  >
-                    <Page
-                      key={`page_${pageNumber}_rot_${rotation}_${documentKey}`}
-                      pageNumber={pageNumber}
-                      scale={scale}
-                      rotate={rotation}
-                      onLoadSuccess={handlePageLoadSuccess}
-                    />
-                    {isSideBySide &&
-                      pageNumber < (numPages || 0) &&
-                      !showComments && (
-                        <Page
-                          key={`page_${
-                            pageNumber + 1
-                          }_rot_${rotation}_${documentKey}`}
-                          pageNumber={pageNumber + 1}
-                          scale={scale}
-                          rotate={rotation}
-                          onLoadSuccess={handlePageLoadSuccess}
-                        />
+                      {retryCount < 3 && (
+                        <button
+                          onClick={handleRetry}
+                          disabled={isRetrying}
+                          className="ml-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50"
+                        >
+                          {isRetrying
+                            ? `Retrying in ${Math.pow(2, retryCount)}s...`
+                            : `Auto Retry (${retryCount}/3)`}
+                        </button>
                       )}
-                  </div>
-                )}
-              </Document>
+                    </div>
+                  }
+                  options={options}
+                >
+                  {viewMode === "continuous" ? (
+                    <div
+                      className="space-y-4"
+                      key={`continuous-${documentKey}`}
+                    >
+                      {renderAllPages()}
+                    </div>
+                  ) : (
+                    <div
+                      key={`single-${documentKey}`}
+                      className={`flex ${
+                        isSideBySide && !showComments ? "space-x-4" : ""
+                      }`}
+                    >
+                      <Page
+                        key={`page_${pageNumber}_rot_${rotation}_${documentKey}`}
+                        pageNumber={pageNumber}
+                        scale={scale}
+                        rotate={rotation}
+                        onLoadSuccess={handlePageLoadSuccess}
+                      />
+                      {isSideBySide &&
+                        pageNumber < (numPages || 0) &&
+                        !showComments && (
+                          <Page
+                            key={`page_${
+                              pageNumber + 1
+                            }_rot_${rotation}_${documentKey}`}
+                            pageNumber={pageNumber + 1}
+                            scale={scale}
+                            rotate={rotation}
+                            onLoadSuccess={handlePageLoadSuccess}
+                          />
+                        )}
+                    </div>
+                  )}
+                </Document>
+              )}
             </div>
           </div>
 
